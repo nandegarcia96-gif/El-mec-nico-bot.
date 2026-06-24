@@ -25,6 +25,7 @@ const TOKENS_ROLE = "1517347810167619697";
 const PRISON_ROLE = "1459458843816759412";
 const IMMUNITY_ROLE = "1515011976621854790";
 
+// 📜 LOG CHANNEL
 const LOG_CHANNEL = "1519438831479427192";
 
 const prefix = ">";
@@ -51,32 +52,52 @@ client.on("messageCreate", async (message) => {
   if (args[0] === "call" && args[1] === "mechanic") {
 
     if (!message.member.roles.cache.has(TOKENS_ROLE)) {
-      return message.reply("❌ No tienes acceso.");
+      return message.reply("❌ No tienes acceso a la tienda.");
     }
 
     const embed = new EmbedBuilder()
       .setTitle("🛒 The Mechanic Store")
       .setDescription(
-        "🧷 Encadenamiento (1 token)\n" +
-        "🔓 Liberación (1 token)\n" +
-        "✏️ Renombrar (1 token)\n" +
-        "🛡️ Inmunidad CD (1 token)"
+        "```yaml\n" +
+        "🧷 ENCANDENAMIENTO\n" +
+        "💰 1 TOKEN\n" +
+        "⛓️ 30 minutos de prisión\n" +
+        "────────────────────\n\n" +
+
+        "🔓 LIBERACIÓN\n" +
+        "💰 1 TOKEN\n" +
+        "🚪 elimina prisión\n" +
+        "────────────────────\n\n" +
+
+        "✏️ RENOMBRAR USUARIO\n" +
+        "💰 1 TOKEN\n" +
+        "📝 40 minutos de cambio\n" +
+        "────────────────────\n\n" +
+
+        "🛡️ INMUNIDAD CD\n" +
+        "💰 1 TOKEN\n" +
+        "⏳ 1 hora protección\n" +
+        "```"
       )
-      .setColor(0x8b5cf6);
+      .setColor(0x8b5cf6)
+      .setFooter({ text: "Selecciona un ítem 👇" });
 
     const menu = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId("shop_menu")
-        .setPlaceholder("Selecciona item")
+        .setPlaceholder("🛒 Abrir tienda")
         .addOptions([
-          { label: "Encadenar", value: "chain" },
-          { label: "Liberar", value: "release" },
-          { label: "Renombrar", value: "rename" },
-          { label: "Inmunidad", value: "immunity" }
+          { label: "Encadenar", value: "chain", emoji: "🧷" },
+          { label: "Liberar", value: "release", emoji: "🔓" },
+          { label: "Renombrar", value: "rename", emoji: "✏️" },
+          { label: "Inmunidad CD", value: "immunity", emoji: "🛡️" }
         ])
     );
 
-    return message.channel.send({ embeds: [embed], components: [menu] });
+    return message.channel.send({
+      embeds: [embed],
+      components: [menu]
+    });
   }
 });
 
@@ -90,27 +111,28 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     const option = interaction.values[0];
 
+    // RENOMBRAR → USER SELECT
     if (option === "rename") {
 
       const menu = new ActionRowBuilder().addComponents(
         new UserSelectMenuBuilder()
-          .setCustomId(`user_${option}`)
-          .setPlaceholder("Selecciona usuario")
+          .setCustomId("user_rename")
+          .setPlaceholder("👤 Selecciona usuario")
           .setMaxValues(1)
       );
 
       return interaction.reply({
-        content: "👤 Elige usuario:",
+        content: "👤 Elige usuario a renombrar:",
         components: [menu],
         ephemeral: true
       });
     }
 
-    // otros items también usan user select
+    // OTROS → USER SELECT
     const menu = new ActionRowBuilder().addComponents(
       new UserSelectMenuBuilder()
         .setCustomId(`user_${option}`)
-        .setPlaceholder("Selecciona usuario")
+        .setPlaceholder("👤 Selecciona usuario")
         .setMaxValues(1)
     );
 
@@ -185,7 +207,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.reply({ content: "🛡️ Inmunidad activada.", ephemeral: true });
     }
 
-    // ✏️ RENOMBRAR (requiere modal extra)
+    // ✏️ RENOMBRAR → MODAL
     if (action === "rename") {
 
       const modal = new ModalBuilder()
@@ -194,7 +216,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const input = new TextInputBuilder()
         .setCustomId("new_name")
-        .setLabel("Nuevo nombre")
+        .setLabel("Escribe el nuevo nombre")
         .setStyle(TextInputStyle.Short)
         .setRequired(true);
 
