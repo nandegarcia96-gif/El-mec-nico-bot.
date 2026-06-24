@@ -25,21 +25,18 @@ const TOKENS_ROLE = "1517347810167619697";
 const PRISON_ROLE = "1459458843816759412";
 const IMMUNITY_ROLE = "1515011976621854790";
 
-// 📜 LOG CHANNEL
 const LOG_CHANNEL = "1519438831479427192";
 
 const prefix = ">";
 
 // ─────────────────────────────
-// 📜 LOG FUNCTION
+// 📜 LOGS
 // ─────────────────────────────
-async function sendLog(guild, text) {
+async function log(guild, msg) {
   try {
-    const channel = await guild.channels.fetch(LOG_CHANNEL);
-    if (channel) channel.send({ content: text });
-  } catch (err) {
-    console.log("Error logs:", err);
-  }
+    const ch = await guild.channels.fetch(LOG_CHANNEL);
+    if (ch) ch.send({ content: msg });
+  } catch {}
 }
 
 // ─────────────────────────────
@@ -50,50 +47,36 @@ client.on("messageCreate", async (message) => {
   if (!message.content.startsWith(prefix)) return;
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
-  const command = args.shift().toLowerCase();
 
-  if (command === "call" && args[0] === "mechanic") {
+  if (args[0] === "call" && args[1] === "mechanic") {
 
     if (!message.member.roles.cache.has(TOKENS_ROLE)) {
-      return message.reply("❌ No tienes acceso a la tienda.");
+      return message.reply("❌ No tienes acceso.");
     }
 
     const embed = new EmbedBuilder()
       .setTitle("🛒 The Mechanic Store")
       .setDescription(
-        "```yaml\n" +
-        "🧷 Encadenamiento - 1 TOKEN\n" +
-        "⛓️ 30 min prisión\n\n" +
-
-        "🔓 Liberación - 1 TOKEN\n" +
-        "🚪 quita prisión\n\n" +
-
-        "✏️ Renombrar - 1 TOKEN\n" +
-        "📝 40 min cambio de nombre\n\n" +
-
-        "🛡️ Inmunidad CD - 1 TOKEN\n" +
-        "⏳ 1 hora protección\n" +
-        "```"
+        "🧷 Encadenamiento (1 token)\n" +
+        "🔓 Liberación (1 token)\n" +
+        "✏️ Renombrar (1 token)\n" +
+        "🛡️ Inmunidad CD (1 token)"
       )
-      .setColor(0x8b5cf6)
-      .setFooter({ text: "Selecciona un item" });
+      .setColor(0x8b5cf6);
 
     const menu = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId("shop_menu")
-        .setPlaceholder("🛒 Abrir tienda")
+        .setPlaceholder("Selecciona item")
         .addOptions([
-          { label: "Encadenamiento", value: "chain", emoji: "🧷" },
-          { label: "Liberación", value: "release", emoji: "🔓" },
-          { label: "Renombrar", value: "rename", emoji: "✏️" },
-          { label: "Inmunidad CD", value: "immunity", emoji: "🛡️" }
+          { label: "Encadenar", value: "chain" },
+          { label: "Liberar", value: "release" },
+          { label: "Renombrar", value: "rename" },
+          { label: "Inmunidad", value: "immunity" }
         ])
     );
 
-    return message.channel.send({
-      embeds: [embed],
-      components: [menu]
-    });
+    return message.channel.send({ embeds: [embed], components: [menu] });
   }
 });
 
@@ -102,53 +85,111 @@ client.on("messageCreate", async (message) => {
 // ─────────────────────────────
 client.on(Events.InteractionCreate, async (interaction) => {
 
-  // MENU
+  // ───── MENU ─────
   if (interaction.isStringSelectMenu()) {
 
     const option = interaction.values[0];
 
-    // RENOMBRAR (USER SELECT)
     if (option === "rename") {
 
       const menu = new ActionRowBuilder().addComponents(
         new UserSelectMenuBuilder()
-          .setCustomId("rename_select_user")
-          .setPlaceholder("👤 Selecciona usuario")
+          .setCustomId(`user_${option}`)
+          .setPlaceholder("Selecciona usuario")
           .setMaxValues(1)
       );
 
       return interaction.reply({
-        content: "👤 Selecciona usuario a renombrar:",
+        content: "👤 Elige usuario:",
         components: [menu],
         ephemeral: true
       });
     }
 
-    // OTROS ITEMS (MODAL)
-    const modal = new ModalBuilder()
-      .setCustomId(`action_${option}`)
-      .setTitle("The Mechanic");
+    // otros items también usan user select
+    const menu = new ActionRowBuilder().addComponents(
+      new UserSelectMenuBuilder()
+        .setCustomId(`user_${option}`)
+        .setPlaceholder("Selecciona usuario")
+        .setMaxValues(1)
+    );
 
-    const input = new TextInputBuilder()
-      .setCustomId("target_user")
-      .setLabel("Menciona al usuario (@usuario)")
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true);
-
-    modal.addComponents(new ActionRowBuilder().addComponents(input));
-
-    return interaction.showModal(modal);
+    return interaction.reply({
+      content: "👤 Elige usuario:",
+      components: [menu],
+      ephemeral: true
+    });
   }
 
-  // USER SELECT (RENOMBRE)
+  // ───── USER SELECT ─────
   if (interaction.isUserSelectMenu()) {
 
-    if (interaction.customId === "rename_select_user") {
+    const [_, action] = interaction.customId.split("_");
+    const targetId = interaction.values[0];
 
-      const targetId = interaction.values[0];
+    const guild = interaction.guild;
+    const buyer = interaction.member;
+
+    const target = await guild.members.fetch(targetId).catch(() => null);
+
+    if (!target) {
+      return interaction.reply({ content: "❌ Usuario no encontrado.", ephemeral: true });
+    }
+
+    // 🧷 ENC
+    if (action === "chain") {
+
+      await target.roles.add(PRISON_ROLE);
+
+      setTimeout(async () => {
+        try {
+          const m = await guild.members.fetch(target.id);
+          await m.roles.remove(PRISON_ROLE);
+        } catch {}
+      }, 30 * 60 * 1000);
+
+      await buyer.roles.remove(TOKENS_ROLE);
+
+      await log(guild, `⛓️ ${buyer.user.tag} encadenó a ${target.user.tag}`);
+
+      return interaction.reply({ content: "⛓️ Encadenado.", ephemeral: true });
+    }
+
+    // 🔓 LIB
+    if (action === "release") {
+
+      await target.roles.remove(PRISON_ROLE);
+      await buyer.roles.remove(TOKENS_ROLE);
+
+      await log(guild, `🔓 ${buyer.user.tag} liberó a ${target.user.tag}`);
+
+      return interaction.reply({ content: "🔓 Liberado.", ephemeral: true });
+    }
+
+    // 🛡️ INMUNIDAD
+    if (action === "immunity") {
+
+      await target.roles.add(IMMUNITY_ROLE);
+
+      setTimeout(async () => {
+        try {
+          const m = await guild.members.fetch(target.id);
+          await m.roles.remove(IMMUNITY_ROLE);
+        } catch {}
+      }, 60 * 60 * 1000);
+
+      await buyer.roles.remove(TOKENS_ROLE);
+
+      await log(guild, `🛡️ ${buyer.user.tag} dio inmunidad a ${target.user.tag}`);
+
+      return interaction.reply({ content: "🛡️ Inmunidad activada.", ephemeral: true });
+    }
+
+    // ✏️ RENOMBRAR (requiere modal extra)
+    if (action === "rename") {
 
       const modal = new ModalBuilder()
-        .setCustomId(`rename_final_${targetId}`)
+        .setCustomId(`rename_${targetId}`)
         .setTitle("Nuevo nombre");
 
       const input = new TextInputBuilder()
@@ -163,84 +204,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
   }
 
-  // MODALS
+  // ───── MODAL ─────
   if (interaction.isModalSubmit()) {
 
     const guild = interaction.guild;
     const buyer = interaction.member;
-    const action = interaction.customId;
 
-    // 💸 CHECK TOKEN (except rename final)
-    if (!action.startsWith("rename_final_")) {
-      if (!buyer.roles.cache.has(TOKENS_ROLE)) {
-        return interaction.reply({ content: "❌ No tienes TOKENS.", ephemeral: true });
-      }
-      await buyer.roles.remove(TOKENS_ROLE);
-    }
+    if (interaction.customId.startsWith("rename_")) {
 
-    const input = interaction.fields.getTextInputValue("target_user");
-    const mention = input?.match?.(/^<@!?(\d+)>$/);
-
-    let target = null;
-
-    if (mention) {
-      target = await guild.members.fetch(mention[1]).catch(() => null);
-    }
-
-    // 🧷 ENC
-    if (action === "action_chain") {
-
-      if (!target) return interaction.reply({ content: "❌ Mención inválida.", ephemeral: true });
-
-      await target.roles.add(PRISON_ROLE);
-
-      setTimeout(async () => {
-        try {
-          const m = await guild.members.fetch(target.id);
-          await m.roles.remove(PRISON_ROLE);
-        } catch {}
-      }, 30 * 60 * 1000);
-
-      await sendLog(guild, `⛓️ ${target.user.tag} fue encadenado por ${buyer.user.tag}`);
-
-      return interaction.reply({ content: "⛓️ Encadenado.", ephemeral: true });
-    }
-
-    // 🔓 LIB
-    if (action === "action_release") {
-
-      if (!target) return interaction.reply({ content: "❌ Mención inválida.", ephemeral: true });
-
-      await target.roles.remove(PRISON_ROLE);
-
-      await sendLog(guild, `🔓 ${target.user.tag} fue liberado por ${buyer.user.tag}`);
-
-      return interaction.reply({ content: "🔓 Liberado.", ephemeral: true });
-    }
-
-    // 🛡️ INMUNIDAD
-    if (action === "action_immunity") {
-
-      if (!target) return interaction.reply({ content: "❌ Mención inválida.", ephemeral: true });
-
-      await target.roles.add(IMMUNITY_ROLE);
-
-      setTimeout(async () => {
-        try {
-          const m = await guild.members.fetch(target.id);
-          await m.roles.remove(IMMUNITY_ROLE);
-        } catch {}
-      }, 60 * 60 * 1000);
-
-      await sendLog(guild, `🛡️ ${target.user.tag} recibió inmunidad CD por ${buyer.user.tag}`);
-
-      return interaction.reply({ content: "🛡️ Inmunidad activada.", ephemeral: true });
-    }
-
-    // ✏️ RENOMBRE FINAL
-    if (action.startsWith("rename_final_")) {
-
-      const targetId = action.split("_")[2];
+      const targetId = interaction.customId.split("_")[1];
       const newName = interaction.fields.getTextInputValue("new_name");
 
       const member = await guild.members.fetch(targetId);
@@ -256,10 +228,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         } catch {}
       }, 40 * 60 * 1000);
 
-      await sendLog(
-        guild,
-        `✏️ ${member.user.tag} fue renombrado a "${newName}" por ${buyer.user.tag}`
-      );
+      await buyer.roles.remove(TOKENS_ROLE);
+
+      await log(guild, `✏️ ${buyer.user.tag} renombró a ${member.user.tag}`);
 
       return interaction.reply({
         content: "✏️ Renombrado correctamente.",
