@@ -4,8 +4,6 @@ const {
   Events,
   EmbedBuilder,
   ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
   StringSelectMenuBuilder,
   ModalBuilder,
   TextInputBuilder,
@@ -29,7 +27,7 @@ const PRISON_ROLE = "1459458843816759412";
 const prefix = ">";
 
 // ─────────────────────────────
-// 🛒 COMANDO TIENDA
+// 🛒 TIENDA
 // ─────────────────────────────
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
@@ -48,16 +46,16 @@ client.on("messageCreate", async (message) => {
       .setTitle("🛒 The Mechanic Store")
       .setDescription(
         "```yaml\n" +
-        "ITEM DISPONIBLE\n" +
+        "ITEMS DISPONIBLES\n" +
         "────────────────────\n" +
         "🧷 Encadenamiento\n" +
-        "💰 Precio: 1 TOKEN\n" +
-        "🎯 Encadena a un usuario\n" +
+        "🔓 Liberación de cárcel\n" +
+        "💰 Precio: 1 TOKEN cada uno\n" +
         "────────────────────\n" +
         "```"
       )
       .setColor(0x8b5cf6)
-      .setFooter({ text: "Selecciona un item abajo" });
+      .setFooter({ text: "Selecciona un item en el menú inferior" });
 
     const menu = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
@@ -69,6 +67,12 @@ client.on("messageCreate", async (message) => {
             description: "Encadena a un usuario (1 token)",
             value: "chain",
             emoji: "🧷"
+          },
+          {
+            label: "Liberación de cárcel",
+            description: "Libera a un usuario (1 token)",
+            value: "release",
+            emoji: "🔓"
           }
         ])
     );
@@ -90,75 +94,99 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (interaction.customId === "shop_menu") {
 
-      if (interaction.values[0] === "chain") {
+      const option = interaction.values[0];
 
-        const modal = new ModalBuilder()
-          .setCustomId("chain_modal")
-          .setTitle("🧷 Encadenar usuario");
+      const modal = new ModalBuilder()
+        .setCustomId(`action_${option}`)
+        .setTitle(option === "chain" ? "Encadenar usuario" : "Liberar usuario");
 
-        const input = new TextInputBuilder()
-          .setCustomId("target_user")
-          .setLabel("Escribe nombre, @usuario o ID")
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder("Ej: Juan / @user / 123456")
-          .setRequired(true);
+      const input = new TextInputBuilder()
+        .setCustomId("target_user")
+        .setLabel("Escribe nombre, @usuario o ID")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
 
-        const row = new ActionRowBuilder().addComponents(input);
+      const row = new ActionRowBuilder().addComponents(input);
 
-        modal.addComponents(row);
+      modal.addComponents(row);
 
-        return interaction.showModal(modal);
-      }
+      return interaction.showModal(modal);
     }
   }
 
-  // 🧾 MODAL SUBMIT (COMPRA FINAL)
+  // 🧾 MODAL SUBMIT
   if (interaction.isModalSubmit()) {
 
-    if (interaction.customId === "chain_modal") {
+    const input = interaction.fields.getTextInputValue("target_user");
+    const buyer = interaction.member;
 
-      const input = interaction.fields.getTextInputValue("target_user");
+    if (!buyer.roles.cache.has(TOKENS_ROLE)) {
+      return interaction.reply({
+        content: "❌ No tienes TOKENS.",
+        ephemeral: true
+      });
+    }
 
-      const buyer = interaction.member;
+    const guild = interaction.guild;
 
-      // ❌ CHECK TOKENS
-      if (!buyer.roles.cache.has(TOKENS_ROLE)) {
-        return interaction.reply({
-          content: "❌ No tienes TOKENS para comprar.",
-          ephemeral: true
-        });
-      }
+    const target = guild.members.cache.find(m =>
+      m.user.username.toLowerCase() === input.toLowerCase() ||
+      m.id === input.replace(/[^0-9]/g, "")
+    );
 
-      const guild = interaction.guild;
+    if (!target) {
+      return interaction.reply({
+        content: "❌ Usuario no encontrado.",
+        ephemeral: true
+      });
+    }
 
-      // 🔎 BUSCAR USUARIO
-      const target = guild.members.cache.find(m =>
-        m.user.username.toLowerCase() === input.toLowerCase() ||
-        m.id === input.replace(/[^0-9]/g, "")
-      );
+    const action = interaction.customId.replace("action_", "");
 
-      if (!target) {
-        return interaction.reply({
-          content: "❌ Usuario no encontrado.",
-          ephemeral: true
-        });
-      }
+    // 💸 gastar token
+    await buyer.roles.remove(TOKENS_ROLE);
 
-      // ⛓️ DAR PRISIÓN
+    // ────────────────
+    // 🧷 ENCADENAR
+    // ────────────────
+    if (action === "chain") {
+
       await target.roles.add(PRISON_ROLE);
 
-      // 💸 QUITAR TOKENS
-      await buyer.roles.remove(TOKENS_ROLE);
+      // ⏳ auto remover en 30 min
+      setTimeout(async () => {
+        try {
+          const refreshed = await interaction.guild.members.fetch(target.id);
+          if (refreshed.roles.cache.has(PRISON_ROLE)) {
+            await refreshed.roles.remove(PRISON_ROLE);
+          }
+        } catch (err) {
+          console.log("Error quitando prisión:", err);
+        }
+      }, 30 * 60 * 1000);
 
       return interaction.reply({
-        content: `⛓️ ${target.user.username} ha sido encadenado correctamente.`,
+        content: `⛓️ ${target.user.username} ha sido encadenado por 30 minutos.`,
+        ephemeral: true
+      });
+    }
+
+    // ────────────────
+    // 🔓 LIBERAR
+    // ────────────────
+    if (action === "release") {
+
+      await target.roles.remove(PRISON_ROLE);
+
+      return interaction.reply({
+        content: `🔓 ${target.user.username} ha sido liberado de la cárcel.`,
         ephemeral: true
       });
     }
   }
 });
 
-// 🤖 BOT READY
+// 🤖 READY
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ Bot activo como ${c.user.tag}`);
 });
