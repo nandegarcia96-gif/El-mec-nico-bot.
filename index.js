@@ -8,7 +8,9 @@ const {
   UserSelectMenuBuilder,
   ModalBuilder,
   TextInputBuilder,
-  TextInputStyle
+  TextInputStyle,
+  ButtonBuilder,
+  ButtonStyle
 } = require("discord.js");
 
 const client = new Client({
@@ -24,61 +26,50 @@ const client = new Client({
 const TOKENS_ROLE = "1517347810167619697";
 const PRISON_ROLE = "1459458843816759412";
 const IMMUNITY_ROLE = "1515011976621854790";
-const SHIELD_ROLE = "ID_DEL_ROL_ESCUDO"; // ⚠️ pon tu ID real
+const SHIELD_ROLE = "ID_DEL_ROL_ESCUDO";
 
-// 📜 LOG CHANNEL
+// 📜 LOGS
 const LOG_CHANNEL = "1519438831479427192";
 
 const prefix = ">";
 
 // ─────────────────────────────
-// 📜 LOGS
-// ─────────────────────────────
-async function log(guild, msg) {
-  try {
-    const ch = await guild.channels.fetch(LOG_CHANNEL);
-    if (ch) ch.send({ content: msg });
-  } catch {}
-}
-
-// ─────────────────────────────
-// 🛡️ ESCUDO (1 IMPACTO)
-// ─────────────────────────────
-async function breakShieldIfExists(target, guild) {
-  if (!target.roles.cache.has(SHIELD_ROLE)) return false;
-
-  await target.roles.remove(SHIELD_ROLE).catch(() => {});
-
-  try {
-    const ch = await guild.channels.fetch(LOG_CHANNEL);
-    if (ch) ch.send(`🛡️ El escudo de ${target.user.tag} se ha roto.`);
-  } catch {}
-
-  return true;
-}
-
-// ─────────────────────────────
-// 🛒 TIENDA (LOADING CYBER)
+// 🤖 MENSAJE AL PING BOT
 // ─────────────────────────────
 client.on("messageCreate", async (message) => {
+
   if (message.author.bot) return;
+
+  // 🤖 ping al bot
+  if (message.mentions.has(client.user)) {
+    return message.reply(
+      "🤖 Parece que no tengo ningún motivo para ayudarte.\n" +
+      "vuelve cuando tengas un token o algo de mi interés."
+    );
+  }
+
+  // comando
   if (!message.content.startsWith(prefix)) return;
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
 
+  // 🛒 TIENDA
   if (args[0] === "call" && args[1] === "mechanic") {
 
     if (!message.member.roles.cache.has(TOKENS_ROLE)) {
-      return message.reply("❌ No tienes acceso.");
+      return message.reply(
+        "🤖 Parece que no tengo ningún motivo para ayudarte.\n" +
+        "vuelve cuando tengas un token o algo de mi interés."
+      );
     }
 
     const loading = await message.channel.send("🟣 ⚙️ iniciando sistema...");
 
     await new Promise(r => setTimeout(r, 1200));
-    await loading.edit("🟣 🧠 conectando núcleo...");
+    await loading.edit("🟣 🤖 conectando núcleo...");
 
     await new Promise(r => setTimeout(r, 1200));
-    await loading.edit("🟣 🔓 descifrando tienda...");
+    await loading.edit("🟣 🔓 cargando tienda...");
 
     await new Promise(r => setTimeout(r, 900));
 
@@ -89,40 +80,45 @@ client.on("messageCreate", async (message) => {
 
         "🧷 ENCANDENAMIENTO\n🪙 1 TOKEN\n⛓️ 30 min\n\n" +
 
-        "⛓️ LIBERACIÓN\n🪙 1 TOKEN\n⛓️💥 remove prisión\n\n" +
+        "⛓️ LIBERACIÓN\n🪙 1 TOKEN\n⛓️💥 elimina prisión\n\n" +
 
-        "✏️ RENOMBRAR\n🪙 1 TOKEN\n📝 40 min\n\n" +
+        "✏️ RENOMBRAR USUARIO\n🪙 1 TOKEN\n🤖 cambio temporal 40 min\n\n" +
 
-        "🛡️ INMUNIDAD CD\n🪙 1 TOKEN\n⏳ 1 hora\n\n" +
+        "🛡️ INMUNIDAD CD\n🪙 1 TOKEN\n🤖 ignora slowmode del sistema\n⏳ 1 hora\n\n" +
 
-        "🛡️ ESCUDO [1 IMPACTO]\n🪙 1 TOKEN\n" +
-        "🧠 Bloquea 1 intento de cualquier ítem\n" +
-        "💥 Se rompe al primer ataque\n" +
-        "⏳ Dura hasta 1 hora\n" +
+        "🛡️ ESCUDO [1 IMPACTO]\n🪙 1 TOKEN\n💥 bloquea 1 intento de ítem\n⏳ 1 hora\n" +
 
         "```"
       )
       .setColor(0x8b5cf6)
       .setImage("https://cdn.discordapp.com/attachments/1402268718360297544/1519443095379513496/E42BDE84-B055-4A1C-B788-620B7DC904AD.gif")
-      .setFooter({ text: "⚙️ sistema activo" });
+      .setFooter({ text: "🤖 system online" });
 
     const menu = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId("shop_menu")
-        .setPlaceholder("⚡ seleccionar módulo")
+        .setPlaceholder("seleccionar módulo")
         .addOptions([
           { label: "Encadenar", value: "chain", emoji: "🧷" },
           { label: "Liberación", value: "release", emoji: "⛓️‍💥" },
           { label: "Renombrar", value: "rename", emoji: "✏️" },
           { label: "Inmunidad CD", value: "immunity", emoji: "🛡️" },
-          { label: "Escudo [1 impacto]", value: "shield", emoji: "🛡️" }
+          { label: "Escudo", value: "shield", emoji: "🛡️" }
         ])
+    );
+
+    const closeBtn = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("close_shop")
+        .setLabel("Cerrar tienda")
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji("❌")
     );
 
     await loading.edit({
       content: "",
       embeds: [embed],
-      components: [menu]
+      components: [menu, closeBtn]
     });
   }
 });
@@ -132,6 +128,28 @@ client.on("messageCreate", async (message) => {
 // ─────────────────────────────
 client.on(Events.InteractionCreate, async (interaction) => {
 
+  // ❌ CERRAR TIENDA (ANIMACIÓN LIMPIA)
+  if (interaction.isButton() && interaction.customId === "close_shop") {
+
+    await interaction.update({
+      content: "🤖 cerrando sistema...",
+      embeds: [],
+      components: []
+    });
+
+    await new Promise(r => setTimeout(r, 1200));
+
+    await interaction.editReply({
+      content: "🤖 apagando interfaz..."
+    });
+
+    await new Promise(r => setTimeout(r, 1200));
+
+    return interaction.editReply({
+      content: "tienda cerrada."
+    });
+  }
+
   // MENU
   if (interaction.isStringSelectMenu()) {
 
@@ -140,12 +158,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const menu = new ActionRowBuilder().addComponents(
       new UserSelectMenuBuilder()
         .setCustomId(`user_${option}`)
-        .setPlaceholder("👤 selecciona usuario")
+        .setPlaceholder("selecciona usuario")
         .setMaxValues(1)
     );
 
     return interaction.reply({
-      content: "👤 elige usuario:",
+      content: "elige usuario:",
       components: [menu],
       ephemeral: true
     });
@@ -161,15 +179,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const buyer = interaction.member;
 
     const target = await guild.members.fetch(targetId).catch(() => null);
+    if (!target) return interaction.reply({ content: "usuario no encontrado", ephemeral: true });
 
-    if (!target) {
-      return interaction.reply({ content: "❌ Usuario no encontrado.", ephemeral: true });
-    }
+    // 🛡️ ESCUDO
+    if (target.roles.cache.has(SHIELD_ROLE)) {
 
-    // 🛡️ ESCUDO CHECK
-    if (await breakShieldIfExists(target, guild)) {
+      await target.roles.remove(SHIELD_ROLE).catch(() => {});
+
       return interaction.reply({
-        content: "🛡️ El escudo bloqueó el efecto y se rompió.",
+        content: "🛡️ el escudo bloqueó el efecto y se consumió",
         ephemeral: true
       });
     }
@@ -188,9 +206,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       await buyer.roles.remove(TOKENS_ROLE);
 
-      await log(guild, `⛓️ ${buyer.user.tag} encadenó a ${target.user.tag}`);
-
-      return interaction.reply({ content: "⛓️ Encadenado.", ephemeral: true });
+      return interaction.reply({ content: "encadenado", ephemeral: true });
     }
 
     // ⛓️‍💥 LIBERACIÓN
@@ -199,9 +215,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await target.roles.remove(PRISON_ROLE);
       await buyer.roles.remove(TOKENS_ROLE);
 
-      await log(guild, `⛓️‍💥 ${buyer.user.tag} liberó a ${target.user.tag}`);
-
-      return interaction.reply({ content: "⛓️‍💥 Liberado.", ephemeral: true });
+      return interaction.reply({ content: "liberado", ephemeral: true });
     }
 
     // 🛡️ INMUNIDAD CD
@@ -218,9 +232,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       await buyer.roles.remove(TOKENS_ROLE);
 
-      await log(guild, `🛡️ ${buyer.user.tag} dio inmunidad a ${target.user.tag}`);
-
-      return interaction.reply({ content: "🛡️ Inmunidad activada.", ephemeral: true });
+      return interaction.reply({ content: "inmunidad activa", ephemeral: true });
     }
 
     // 🛡️ ESCUDO
@@ -237,12 +249,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       await buyer.roles.remove(TOKENS_ROLE);
 
-      await log(guild, `🛡️ ${buyer.user.tag} dio ESCUDO a ${target.user.tag}`);
-
-      return interaction.reply({
-        content: "🛡️ Escudo [1 impacto] activado.",
-        ephemeral: true
-      });
+      return interaction.reply({ content: "escudo activado", ephemeral: true });
     }
 
     // ✏️ RENOMBRAR
@@ -250,13 +257,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const modal = new ModalBuilder()
         .setCustomId(`rename_${targetId}`)
-        .setTitle("Nuevo nombre");
+        .setTitle("nuevo nombre");
 
       const input = new TextInputBuilder()
         .setCustomId("new_name")
-        .setLabel("Escribe el nuevo nombre")
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true);
+        .setLabel("nombre")
+        .setStyle(TextInputStyle.Short);
 
       modal.addComponents(new ActionRowBuilder().addComponents(input));
 
@@ -264,36 +270,33 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
   }
 
-  // MODAL
+  // MODAL RENOMBRAR
   if (interaction.isModalSubmit()) {
 
-    const guild = interaction.guild;
-    const buyer = interaction.member;
-
     if (interaction.customId.startsWith("rename_")) {
+
+      const guild = interaction.guild;
+      const buyer = interaction.member;
 
       const targetId = interaction.customId.split("_")[1];
       const newName = interaction.fields.getTextInputValue("new_name");
 
       const member = await guild.members.fetch(targetId);
-
-      const oldName = member.nickname || member.user.username;
+      const old = member.nickname || member.user.username;
 
       await member.setNickname(newName);
 
       setTimeout(async () => {
         try {
           const m = await guild.members.fetch(targetId);
-          await m.setNickname(oldName);
+          await m.setNickname(old);
         } catch {}
       }, 40 * 60 * 1000);
 
       await buyer.roles.remove(TOKENS_ROLE);
 
-      await log(guild, `✏️ ${buyer.user.tag} renombró a ${member.user.tag}`);
-
       return interaction.reply({
-        content: "✏️ Renombrado correctamente.",
+        content: "renombrado aplicado",
         ephemeral: true
       });
     }
@@ -301,7 +304,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 client.once(Events.ClientReady, () => {
-  console.log("⚙️ Mechanic online");
+  console.log("🤖 mechanic online");
 });
 
 client.login(process.env.TOKEN);
