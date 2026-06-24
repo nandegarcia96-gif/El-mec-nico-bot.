@@ -18,12 +18,16 @@ const client = new Client({
   ]
 });
 
-// IDS
+// 🔐 IDS DE ROLES
 const TOKENS_ROLE = "1517347810167619697";
 const PRISON_ROLE = "1459458843816759412";
 
+// ⚙️ PREFIX
 const prefix = ">";
 
+// ─────────────────────────────
+// 🧠 COMANDOS DE TEXTO
+// ─────────────────────────────
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   if (!message.content.startsWith(prefix)) return;
@@ -31,7 +35,7 @@ client.on("messageCreate", async (message) => {
   const args = message.content.slice(prefix.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
 
-  // COMANDO TIENDA
+  // 🛒 TIENDA
   if (command === "call" && args[0] === "mechanic") {
     if (!message.member.roles.cache.has(TOKENS_ROLE)) {
       return message.reply("❌ No tienes TOKENS para usar la tienda.");
@@ -39,15 +43,25 @@ client.on("messageCreate", async (message) => {
 
     const embed = new EmbedBuilder()
       .setTitle("🛒 The Mechanic Store")
-      .setDescription("Selecciona un ítem para comprar con tus TOKENS.")
-      .setColor(0x8b5cf6);
+      .setDescription(
+        "```yaml\n" +
+        "ITEM DISPONIBLE\n" +
+        "────────────────────\n" +
+        "🧷 Encadenamiento\n" +
+        "💰 Precio: 1 TOKEN\n" +
+        "🎯 Efecto: Encadena a un usuario\n" +
+        "────────────────────\n" +
+        "```"
+      )
+      .setColor(0x8b5cf6)
+      .setFooter({ text: "Selecciona un item abajo para comprar" });
 
-    // BOTÓN DEL ITEM
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId("buy_chain")
         .setLabel("🧷 Comprar Encadenamiento")
-        .setStyle(ButtonStyle.Danger)
+        .setEmoji("🔗")
+        .setStyle(ButtonStyle.Primary)
     );
 
     return message.channel.send({
@@ -57,40 +71,44 @@ client.on("messageCreate", async (message) => {
   }
 });
 
+// ─────────────────────────────
+// ⚡ INTERACCIONES (BOTONES / MENÚS)
+// ─────────────────────────────
 client.on(Events.InteractionCreate, async (interaction) => {
-  if (!interaction.isButton()) return;
 
-  // 🧷 COMPRA ENCADENAMIENTO
-  if (interaction.customId === "buy_chain") {
-    const guild = interaction.guild;
+  // 🔘 BOTÓN: COMPRAR ENCADENAMIENTO
+  if (interaction.isButton()) {
+    if (interaction.customId === "buy_chain") {
 
-    const members = await guild.members.fetch();
+      const members = await interaction.guild.members.fetch();
 
-    const options = members
-      .filter(m => !m.user.bot && m.id !== interaction.user.id)
-      .map(m => ({
-        label: m.user.username.slice(0, 25),
-        value: m.id
-      }))
-      .slice(0, 25);
+      const options = members
+        .filter(m => !m.user.bot && m.id !== interaction.user.id)
+        .map(m => ({
+          label: m.user.username.slice(0, 25),
+          value: m.id
+        }))
+        .slice(0, 25);
 
-    const menu = new ActionRowBuilder().addComponents(
-      new StringSelectMenuBuilder()
-        .setCustomId("select_chain_target")
-        .setPlaceholder("Selecciona el usuario a encadenar")
-        .addOptions(options)
-    );
+      const menu = new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId("select_chain_target")
+          .setPlaceholder("Selecciona el usuario a encadenar")
+          .addOptions(options)
+      );
 
-    return interaction.reply({
-      content: "👤 Selecciona el usuario a encadenar:",
-      components: [menu],
-      ephemeral: true
-    });
+      return interaction.reply({
+        content: "👤 Selecciona el usuario que quieres encadenar:",
+        components: [menu],
+        ephemeral: true
+      });
+    }
   }
 
-  // 🎯 EJECUCIÓN FINAL
+  // 🎯 SELECT MENU: EJECUCIÓN FINAL
   if (interaction.isStringSelectMenu()) {
     if (interaction.customId === "select_chain_target") {
+
       const targetId = interaction.values[0];
 
       const guild = interaction.guild;
@@ -98,10 +116,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const buyer = interaction.member;
       const target = await guild.members.fetch(targetId);
 
-      // Dar prisión
+      // ❌ CHECK TOKENS
+      if (!buyer.roles.cache.has(TOKENS_ROLE)) {
+        return interaction.reply({
+          content: "❌ No tienes TOKENS para completar la compra.",
+          ephemeral: true
+        });
+      }
+
+      // ⛓️ DAR PRISIÓN
       await target.roles.add(PRISON_ROLE);
 
-      // Quitar tokens al comprador
+      // 💸 QUITAR TOKENS
       await buyer.roles.remove(TOKENS_ROLE);
 
       return interaction.update({
@@ -112,6 +138,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
+// ─────────────────────────────
+// 🤖 BOT LISTO
+// ─────────────────────────────
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ Bot activo como ${c.user.tag}`);
 });
