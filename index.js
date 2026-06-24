@@ -31,7 +31,7 @@ const LOG_CHANNEL = "1519438831479427192";
 const prefix = ">";
 
 // ─────────────────────────────
-// 📜 LOGS
+// 📜 LOG FUNCTION
 // ─────────────────────────────
 async function log(guild, msg) {
   try {
@@ -41,7 +41,7 @@ async function log(guild, msg) {
 }
 
 // ─────────────────────────────
-// 🛒 TIENDA
+// 🛒 TIENDA CON LOADING
 // ─────────────────────────────
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
@@ -52,40 +52,55 @@ client.on("messageCreate", async (message) => {
   if (args[0] === "call" && args[1] === "mechanic") {
 
     if (!message.member.roles.cache.has(TOKENS_ROLE)) {
-      return message.reply("❌ No tienes acceso a la tienda.");
+      return message.reply("❌ No tienes acceso.");
     }
 
+    // ⚡ LOADING CYBERPUNK
+    const loading = await message.channel.send("🟣 ⚙️ iniciando núcleo del sistema...");
+
+    await new Promise(r => setTimeout(r, 1500));
+    await loading.edit("🟣 🧠 conectando a The Mechanic...");
+
+    await new Promise(r => setTimeout(r, 1500));
+    await loading.edit("🟣 🔓 descifrando tienda segura...");
+
+    await new Promise(r => setTimeout(r, 1000));
+
+    // 🛒 EMBED FINAL
     const embed = new EmbedBuilder()
-      .setTitle("🛒 The Mechanic Store")
+      .setTitle("🛒 ⚙️ THE MECHANIC STORE")
       .setDescription(
         "```yaml\n" +
-        "🧷 ENCANDENAMIENTO\n" +
+
+        "🧷 ⛓️ ENCANDENAMIENTO\n" +
         "💰 1 TOKEN\n" +
-        "⛓️ 30 minutos de prisión\n" +
+        "⛓️ 30 min prisión\n" +
         "────────────────────\n\n" +
 
-        "🔓 LIBERACIÓN\n" +
+        "🔓 🚪 LIBERACIÓN\n" +
         "💰 1 TOKEN\n" +
         "🚪 elimina prisión\n" +
         "────────────────────\n\n" +
 
-        "✏️ RENOMBRAR USUARIO\n" +
+        "✏️ 🧠 RENOMBRAR USUARIO\n" +
         "💰 1 TOKEN\n" +
-        "📝 40 minutos de cambio\n" +
+        "📝 40 min cambio\n" +
         "────────────────────\n\n" +
 
-        "🛡️ INMUNIDAD CD\n" +
+        "🛡️ ⚡ INMUNIDAD CD\n" +
         "💰 1 TOKEN\n" +
         "⏳ 1 hora protección\n" +
+
         "```"
       )
       .setColor(0x8b5cf6)
-      .setFooter({ text: "Selecciona un ítem 👇" });
+      .setImage("https://cdn.discordapp.com/attachments/1402268718360297544/1519443095379513496/E42BDE84-B055-4A1C-B788-620B7DC904AD.gif")
+      .setFooter({ text: "⚙️ sistema listo para operar" });
 
     const menu = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId("shop_menu")
-        .setPlaceholder("🛒 Abrir tienda")
+        .setPlaceholder("⚡ seleccionar módulo")
         .addOptions([
           { label: "Encadenar", value: "chain", emoji: "🧷" },
           { label: "Liberar", value: "release", emoji: "🔓" },
@@ -94,7 +109,8 @@ client.on("messageCreate", async (message) => {
         ])
     );
 
-    return message.channel.send({
+    await loading.edit({
+      content: "",
       embeds: [embed],
       components: [menu]
     });
