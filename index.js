@@ -22,66 +22,8 @@ const client = new Client({
 // 🔐 ROLES
 const TOKENS_ROLE = "1517347810167619697";
 const PRISON_ROLE = "1459458843816759412";
-const GOLD_TOKEN = "1512329392939073636";
-const NAME_LOCK_ROLE = "1426678619006046392";
 
 const prefix = ">";
-
-// ─────────────────────────────
-// 🔎 BUSQUEDA INTELIGENTE
-// ─────────────────────────────
-function similarity(a, b) {
-  a = a.toLowerCase();
-  b = b.toLowerCase();
-
-  let matches = 0;
-
-  for (let char of a) {
-    if (b.includes(char)) matches++;
-  }
-
-  return matches / a.length;
-}
-
-async function findMember(guild, input) {
-  await guild.members.fetch();
-
-  const clean = input.replace(/[^0-9]/g, "");
-
-  // 1️⃣ por ID
-  if (clean) {
-    try {
-      return await guild.members.fetch(clean);
-    } catch {}
-  }
-
-  // 2️⃣ exacto
-  let exact = guild.members.cache.find(m =>
-    m.user.username.toLowerCase() === input.toLowerCase()
-  );
-
-  if (exact) return exact;
-
-  // 3️⃣ fuzzy (mal escrito)
-  let best = null;
-  let bestScore = 0;
-
-  guild.members.cache.forEach(m => {
-    if (m.user.bot) return;
-
-    const score = similarity(input, m.user.username);
-
-    if (score > bestScore) {
-      bestScore = score;
-      best = m;
-    }
-  });
-
-  // mínimo para evitar errores
-  if (bestScore > 0.4) return best;
-
-  return null;
-}
 
 // ─────────────────────────────
 // 🛒 TIENDA
@@ -104,11 +46,11 @@ client.on("messageCreate", async (message) => {
       .setDescription(
         "```yaml\n" +
         "🧷 Encadenamiento - 1 TOKEN\n" +
-        "⛓️ 30 minutos de prisión\n\n" +
+        "⛓️ 30 min\n\n" +
         "🔓 Liberación - 1 TOKEN\n" +
-        "🚪 Libera instantáneamente\n\n" +
-        "✏️ Renombrar - 1 TOKEN DORADO\n" +
-        "📝 Cambia nombre por 40 minutos\n" +
+        "🚪 instantáneo\n\n" +
+        "✏️ Renombrar usuario - 1 TOKEN\n" +
+        "📝 40 min cambio de nombre\n" +
         "```"
       )
       .setColor(0x8b5cf6)
@@ -134,52 +76,83 @@ client.on("messageCreate", async (message) => {
 // ─────────────────────────────
 client.on(Events.InteractionCreate, async (interaction) => {
 
+  // 📋 MENU TIENDA
   if (interaction.isStringSelectMenu()) {
 
     const option = interaction.values[0];
 
-    const modal = new ModalBuilder();
+    // 🧷 ENC + 🔓 LIB
+    if (option === "chain" || option === "release") {
 
-    modal.setCustomId(`action_${option}`);
-    modal.setTitle(option === "rename" ? "Renombrar usuario" : "Acción");
+      const modal = new ModalBuilder()
+        .setCustomId(`action_${option}`)
+        .setTitle("The Mechanic");
 
-    const input = new TextInputBuilder()
-      .setCustomId("target_user")
-      .setLabel("Usuario (nombre o ID)")
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true);
+      const input = new TextInputBuilder()
+        .setCustomId("target_user")
+        .setLabel("Menciona al usuario (@usuario)")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
 
-    modal.addComponents(new ActionRowBuilder().addComponents(input));
+      modal.addComponents(new ActionRowBuilder().addComponents(input));
 
-    return interaction.showModal(modal);
-  }
-
-  if (interaction.isModalSubmit()) {
-
-    const buyer = interaction.member;
-    const guild = interaction.guild;
-
-    const action = interaction.customId;
-    const input = interaction.fields.getTextInputValue("target_user");
-
-    const target = await findMember(guild, input);
-
-    if (!target) {
-      return interaction.reply({
-        content: "❌ No encontré ese usuario.",
-        ephemeral: true
-      });
+      return interaction.showModal(modal);
     }
 
-    // 💸 TOKEN NORMAL
-    if (!action.includes("rename")) {
+    // ✏️ RENOMBRAR → 2 pasos
+    if (option === "rename") {
+
+      const modal = new ModalBuilder()
+        .setCustomId("rename_step1")
+        .setTitle("Seleccionar usuario");
+
+      const input = new TextInputBuilder()
+        .setCustomId("target_user")
+        .setLabel("Menciona al usuario (@usuario)")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+      modal.addComponents(new ActionRowBuilder().addComponents(input));
+
+      return interaction.showModal(modal);
+    }
+  }
+
+  // ─────────────────────────────
+  // 🧾 MODALS
+  // ─────────────────────────────
+  if (interaction.isModalSubmit()) {
+
+    const guild = interaction.guild;
+    const buyer = interaction.member;
+    const action = interaction.customId;
+
+    // 💸 check tokens (except rename step2)
+    if (!action.startsWith("rename_step2")) {
       if (!buyer.roles.cache.has(TOKENS_ROLE)) {
         return interaction.reply({ content: "❌ No tienes TOKENS.", ephemeral: true });
       }
       await buyer.roles.remove(TOKENS_ROLE);
     }
 
-    // 🧷 ENCADENAR
+    // 🔎 parse mention ONLY
+    const input = interaction.fields.getTextInputValue("target_user");
+    const mentionMatch = input.match(/^<@!?(\d+)>$/);
+
+    let target = null;
+
+    if (mentionMatch) {
+      target = await guild.members.fetch(mentionMatch[1]).catch(() => null);
+    }
+
+    if (!target && !action.startsWith("rename_step2")) {
+      return interaction.reply({
+        content: "❌ Debes mencionar al usuario (@usuario).",
+        ephemeral: true
+      });
+    }
+
+    // 🧷 ENC
     if (action === "action_chain") {
 
       await target.roles.add(PRISON_ROLE);
@@ -197,7 +170,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       });
     }
 
-    // 🔓 LIBERAR
+    // 🔓 LIB
     if (action === "action_release") {
 
       await target.roles.remove(PRISON_ROLE);
@@ -208,33 +181,33 @@ client.on(Events.InteractionCreate, async (interaction) => {
       });
     }
 
-    // ✏️ RENOMBRAR (STEP 2)
-    if (action === "action_rename") {
+    // ✏️ STEP 1 RENOMBRE
+    if (action === "rename_step1") {
 
-      if (!buyer.roles.cache.has(GOLD_TOKEN)) {
+      if (!target) {
         return interaction.reply({
-          content: "❌ Necesitas Token Dorado.",
+          content: "❌ Debes mencionar un usuario válido.",
           ephemeral: true
         });
       }
 
-      const newNameModal = new ModalBuilder()
-        .setCustomId(`rename_final_${target.id}`)
+      const modal2 = new ModalBuilder()
+        .setCustomId(`rename_step2_${target.id}`)
         .setTitle("Nuevo nombre");
 
       const input2 = new TextInputBuilder()
         .setCustomId("new_name")
-        .setLabel("Nuevo nombre del usuario")
+        .setLabel("Nuevo nombre")
         .setStyle(TextInputStyle.Short)
         .setRequired(true);
 
-      newNameModal.addComponents(new ActionRowBuilder().addComponents(input2));
+      modal2.addComponents(new ActionRowBuilder().addComponents(input2));
 
-      return interaction.showModal(newNameModal);
+      return interaction.showModal(modal2);
     }
 
-    // ✏️ FINAL RENOMBRE
-    if (action.startsWith("rename_final_")) {
+    // ✏️ STEP 2 RENOMBRE
+    if (action.startsWith("rename_step2_")) {
 
       const targetId = action.split("_")[2];
       const newName = interaction.fields.getTextInputValue("new_name");
