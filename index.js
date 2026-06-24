@@ -42,7 +42,7 @@ async function log(guild, msg) {
 }
 
 // ─────────────────────────────
-// 🛡️ ESCUDO BREAK SYSTEM
+// 🛡️ ESCUDO (1 IMPACTO)
 // ─────────────────────────────
 async function breakShieldIfExists(target, guild) {
   if (!target.roles.cache.has(SHIELD_ROLE)) return false;
@@ -58,7 +58,7 @@ async function breakShieldIfExists(target, guild) {
 }
 
 // ─────────────────────────────
-// 🛒 TIENDA
+// 🛒 TIENDA (LOADING CYBER)
 // ─────────────────────────────
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
@@ -72,26 +72,34 @@ client.on("messageCreate", async (message) => {
       return message.reply("❌ No tienes acceso.");
     }
 
-    // ⚡ LOADING
     const loading = await message.channel.send("🟣 ⚙️ iniciando sistema...");
 
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 1200));
     await loading.edit("🟣 🧠 conectando núcleo...");
 
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 1200));
     await loading.edit("🟣 🔓 descifrando tienda...");
 
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 900));
 
-    // 🛒 EMBED
     const embed = new EmbedBuilder()
       .setTitle("🛒 ⚙️ THE MECHANIC STORE")
       .setDescription(
         "```yaml\n" +
-        "🧷 ENCANDENAMIENTO\n💰 1 TOKEN\n⛓️ 30 min\n\n" +
-        "🔓 LIBERACIÓN\n💰 1 TOKEN\n🚪 remover prisión\n\n" +
-        "✏️ RENOMBRAR\n💰 1 TOKEN\n📝 40 min\n\n" +
-        "🛡️ INMUNIDAD CD\n💰 1 TOKEN\n⏳ 1 hora\n" +
+
+        "🧷 ENCANDENAMIENTO\n🪙 1 TOKEN\n⛓️ 30 min\n\n" +
+
+        "⛓️ LIBERACIÓN\n🪙 1 TOKEN\n⛓️💥 remove prisión\n\n" +
+
+        "✏️ RENOMBRAR\n🪙 1 TOKEN\n📝 40 min\n\n" +
+
+        "🛡️ INMUNIDAD CD\n🪙 1 TOKEN\n⏳ 1 hora\n\n" +
+
+        "🛡️ ESCUDO [1 IMPACTO]\n🪙 1 TOKEN\n" +
+        "🧠 Bloquea 1 intento de cualquier ítem\n" +
+        "💥 Se rompe al primer ataque\n" +
+        "⏳ Dura hasta 1 hora\n" +
+
         "```"
       )
       .setColor(0x8b5cf6)
@@ -104,10 +112,10 @@ client.on("messageCreate", async (message) => {
         .setPlaceholder("⚡ seleccionar módulo")
         .addOptions([
           { label: "Encadenar", value: "chain", emoji: "🧷" },
-          { label: "Liberar", value: "release", emoji: "🔓" },
+          { label: "Liberación", value: "release", emoji: "⛓️‍💥" },
           { label: "Renombrar", value: "rename", emoji: "✏️" },
           { label: "Inmunidad CD", value: "immunity", emoji: "🛡️" },
-          { label: "Escudo", value: "shield", emoji: "🛡️" }
+          { label: "Escudo [1 impacto]", value: "shield", emoji: "🛡️" }
         ])
     );
 
@@ -158,7 +166,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.reply({ content: "❌ Usuario no encontrado.", ephemeral: true });
     }
 
-    // 🛡️ ESCUDO CHECK (ANTES DE TODO)
+    // 🛡️ ESCUDO CHECK
     if (await breakShieldIfExists(target, guild)) {
       return interaction.reply({
         content: "🛡️ El escudo bloqueó el efecto y se rompió.",
@@ -179,20 +187,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }, 30 * 60 * 1000);
 
       await buyer.roles.remove(TOKENS_ROLE);
+
       await log(guild, `⛓️ ${buyer.user.tag} encadenó a ${target.user.tag}`);
 
       return interaction.reply({ content: "⛓️ Encadenado.", ephemeral: true });
     }
 
-    // 🔓 LIB
+    // ⛓️‍💥 LIBERACIÓN
     if (action === "release") {
 
       await target.roles.remove(PRISON_ROLE);
       await buyer.roles.remove(TOKENS_ROLE);
 
-      await log(guild, `🔓 ${buyer.user.tag} liberó a ${target.user.tag}`);
+      await log(guild, `⛓️‍💥 ${buyer.user.tag} liberó a ${target.user.tag}`);
 
-      return interaction.reply({ content: "🔓 Liberado.", ephemeral: true });
+      return interaction.reply({ content: "⛓️‍💥 Liberado.", ephemeral: true });
     }
 
     // 🛡️ INMUNIDAD CD
@@ -214,7 +223,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.reply({ content: "🛡️ Inmunidad activada.", ephemeral: true });
     }
 
-    // 🛡️ SHIELD ITEM
+    // 🛡️ ESCUDO
     if (action === "shield") {
 
       await target.roles.add(SHIELD_ROLE);
@@ -231,7 +240,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await log(guild, `🛡️ ${buyer.user.tag} dio ESCUDO a ${target.user.tag}`);
 
       return interaction.reply({
-        content: "🛡️ Escudo activado (se rompe al primer ataque).",
+        content: "🛡️ Escudo [1 impacto] activado.",
         ephemeral: true
       });
     }
@@ -280,6 +289,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }, 40 * 60 * 1000);
 
       await buyer.roles.remove(TOKENS_ROLE);
+
       await log(guild, `✏️ ${buyer.user.tag} renombró a ${member.user.tag}`);
 
       return interaction.reply({
