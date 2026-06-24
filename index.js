@@ -8,9 +8,7 @@ const {
   UserSelectMenuBuilder,
   ModalBuilder,
   TextInputBuilder,
-  TextInputStyle,
-  ButtonBuilder,
-  ButtonStyle
+  TextInputStyle
 } = require("discord.js");
 
 const client = new Client({
@@ -28,19 +26,26 @@ const PRISON_ROLE = "1459458843816759412";
 const IMMUNITY_ROLE = "1515011976621854790";
 const SHIELD_ROLE = "ID_DEL_ROL_ESCUDO";
 
+// 🛡️ INMUNIDAD A PRISIÓN (ROLES PROTEGIDOS)
+const IMMUNE_ROLES = [
+  "1465082323220562013",
+  "1426385179575975936",
+  "1427393145993429063",
+  "1427099549364781127"
+];
+
 // 📜 LOGS
 const LOG_CHANNEL = "1519438831479427192";
 
 const prefix = ">";
 
 // ─────────────────────────────
-// 🤖 MENSAJE AL PING BOT
+// 🤖 MENSAJES BOT
 // ─────────────────────────────
 client.on("messageCreate", async (message) => {
 
   if (message.author.bot) return;
 
-  // 🤖 ping al bot
   if (message.mentions.has(client.user)) {
     return message.reply(
       "🤖 Parece que no tengo ningún motivo para ayudarte.\n" +
@@ -48,7 +53,6 @@ client.on("messageCreate", async (message) => {
     );
   }
 
-  // comando
   if (!message.content.startsWith(prefix)) return;
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
@@ -103,57 +107,54 @@ client.on("messageCreate", async (message) => {
           { label: "Liberación", value: "release", emoji: "⛓️‍💥" },
           { label: "Renombrar", value: "rename", emoji: "✏️" },
           { label: "Inmunidad CD", value: "immunity", emoji: "🛡️" },
-          { label: "Escudo", value: "shield", emoji: "🛡️" }
+          { label: "Escudo", value: "shield", emoji: "🛡️" },
+          { label: "Cerrar tienda", value: "close", emoji: "❌" }
         ])
-    );
-
-    const closeBtn = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId("close_shop")
-        .setLabel("Cerrar tienda")
-        .setStyle(ButtonStyle.Danger)
-        .setEmoji("❌")
     );
 
     await loading.edit({
       content: "",
       embeds: [embed],
-      components: [menu, closeBtn]
+      components: [menu]
     });
   }
 });
+
+// ─────────────────────────────
+// 🧠 INMUNIDAD A PRISIÓN
+// ─────────────────────────────
+function isImmune(member) {
+  return IMMUNE_ROLES.some(r => member.roles.cache.has(r));
+}
 
 // ─────────────────────────────
 // ⚡ INTERACCIONES
 // ─────────────────────────────
 client.on(Events.InteractionCreate, async (interaction) => {
 
-  // ❌ CERRAR TIENDA (ANIMACIÓN LIMPIA)
-  if (interaction.isButton() && interaction.customId === "close_shop") {
-
-    await interaction.update({
-      content: "🤖 cerrando sistema...",
-      embeds: [],
-      components: []
-    });
-
-    await new Promise(r => setTimeout(r, 1200));
-
-    await interaction.editReply({
-      content: "🤖 apagando interfaz..."
-    });
-
-    await new Promise(r => setTimeout(r, 1200));
-
-    return interaction.editReply({
-      content: "tienda cerrada."
-    });
-  }
-
-  // MENU
+  // ❌ CERRAR TIENDA
   if (interaction.isStringSelectMenu()) {
 
     const option = interaction.values[0];
+
+    if (option === "close") {
+
+      await interaction.update({
+        content: "🤖 cerrando sistema...",
+        embeds: [],
+        components: []
+      });
+
+      await new Promise(r => setTimeout(r, 1200));
+
+      await interaction.editReply({
+        content: "🤖 apagando interfaz..."
+      });
+
+      await new Promise(r => setTimeout(r, 1200));
+
+      return interaction.deleteReply();
+    }
 
     const menu = new ActionRowBuilder().addComponents(
       new UserSelectMenuBuilder()
@@ -169,31 +170,38 @@ client.on(Events.InteractionCreate, async (interaction) => {
     });
   }
 
-  // USER SELECT
+  // 👤 USER SELECT
   if (interaction.isUserSelectMenu()) {
 
     const [_, action] = interaction.customId.split("_");
-    const targetId = interaction.values[0];
 
+    const targetId = interaction.values[0];
     const guild = interaction.guild;
     const buyer = interaction.member;
 
     const target = await guild.members.fetch(targetId).catch(() => null);
     if (!target) return interaction.reply({ content: "usuario no encontrado", ephemeral: true });
 
-    // 🛡️ ESCUDO
+    // 🛡️ ESCUDO 1 IMPACTO
     if (target.roles.cache.has(SHIELD_ROLE)) {
 
       await target.roles.remove(SHIELD_ROLE).catch(() => {});
 
       return interaction.reply({
-        content: "🛡️ el escudo bloqueó el efecto y se consumió",
+        content: "🛡️ escudo activado, efecto cancelado",
         ephemeral: true
       });
     }
 
     // 🧷 ENC
     if (action === "chain") {
+
+      if (isImmune(target)) {
+        return interaction.reply({
+          content: "🤖 el objetivo es inmune al encarcelamiento",
+          ephemeral: true
+        });
+      }
 
       await target.roles.add(PRISON_ROLE);
 
@@ -209,7 +217,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.reply({ content: "encadenado", ephemeral: true });
     }
 
-    // ⛓️‍💥 LIBERACIÓN
+    // ⛓️ LIBERACIÓN
     if (action === "release") {
 
       await target.roles.remove(PRISON_ROLE);
@@ -270,7 +278,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
   }
 
-  // MODAL RENOMBRAR
+  // 📝 MODAL RENOMBRAR
   if (interaction.isModalSubmit()) {
 
     if (interaction.customId.startsWith("rename_")) {
@@ -282,6 +290,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const newName = interaction.fields.getTextInputValue("new_name");
 
       const member = await guild.members.fetch(targetId);
+
       const old = member.nickname || member.user.username;
 
       await member.setNickname(newName);
