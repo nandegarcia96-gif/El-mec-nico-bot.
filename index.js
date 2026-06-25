@@ -62,7 +62,9 @@ const randomNames = [
   "Lobo", "Ángel", "Demonio", "Neón", "Eco"
 ];
 
+// ─────────────────────────────
 // 🔥 TOKEN CONSUMER
+// ─────────────────────────────
 async function consumeToken(member) {
   if (!member.roles.cache.has(TOKENS_ROLE)) return false;
 
@@ -75,7 +77,7 @@ async function consumeToken(member) {
 }
 
 // ─────────────────────────────
-// MESSAGE SYSTEM
+// 🤖 MESSAGE SYSTEM
 // ─────────────────────────────
 client.on("messageCreate", async (message) => {
 
@@ -96,7 +98,6 @@ client.on("messageCreate", async (message) => {
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
 
-  // 🛒 TIENDA
   if (args[0] === "call" && args[1] === "mechanic") {
 
     if (!message.member.roles.cache.has(TOKENS_ROLE)) {
@@ -106,6 +107,7 @@ client.on("messageCreate", async (message) => {
     const loading = await message.channel.send("🟣 ⚙️ iniciando sistema...");
     await new Promise(r => setTimeout(r, 1200));
 
+    // 🔥 TIENDA COMPLETA SIN RECORTES
     const embed = new EmbedBuilder()
       .setTitle("🛒 ⚙️ THE MECHANIC STORE")
       .setDescription(
@@ -301,9 +303,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (!target) return interaction.reply({ content: "no encontrado", ephemeral: true });
 
-    const ok = await consumeToken(buyer);
-    if (!ok) return interaction.reply({ content: "sin token", ephemeral: true });
-
     const old = target.nickname || target.user.username;
 
     await target.setNickname(newName);
@@ -312,8 +311,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
       target.setNickname(old).catch(() => {});
     }, 40 * 60000);
 
+    const ok = await consumeToken(buyer);
+    if (!ok) return interaction.reply({ content: "sin token", ephemeral: true });
+
     return interaction.reply({ content: "cambiado", ephemeral: true });
   }
+});
+
+client.once(Events.ClientReady, () => {
+  console.log("🤖 mechanic online");
 });
 
 client.login(process.env.TOKEN);
