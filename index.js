@@ -74,6 +74,7 @@ client.on("messageCreate", async (message) => {
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
 
+  // 🛒 TIENDA
   if (args[0] === "call" && args[1] === "mechanic") {
 
     if (!message.member.roles.cache.has(TOKENS_ROLE)) {
@@ -134,20 +135,45 @@ client.on("messageCreate", async (message) => {
 
     await loading.edit({ content: "", embeds: [embed], components: [menu] });
   }
+
+  // 📘 HELP
+  if (args[0] === "mechanic" && args[1] === "help") {
+
+    const embed = new EmbedBuilder()
+      .setTitle("🤖 ⚙️ MECHANIC SYSTEM GUIDE")
+      .setColor(0x8b5cf6)
+      .setDescription(
+        "```yaml\n" +
+
+        "🪙 TOKENS\n" +
+        "Moneda del sistema usada para comprar ítems.\n\n" +
+
+        "🧷 ENCANDENAMIENTO\n" +
+        "Prisión temporal de 30 minutos.\n\n" +
+
+        "⛓️ LIBERACIÓN\n" +
+        "Elimina prisión inmediatamente.\n\n" +
+
+        "✏️ RENOMBRAR\n" +
+        "Nickname temporal por 40 minutos.\n\n" +
+
+        "🛡️ INMUNIDAD CD\n" +
+        "Ignora cooldown del sistema por 1 hora.\n\n" +
+
+        "🛡️ ESCUDO [1 IMPACTO]\n" +
+        "Bloquea un ataque y se destruye.\n\n" +
+
+        "📡 AVISO\n" +
+        "La tienda está sujeta a cambios próximamente.\n" +
+        "Se añadirán nuevos ítems y mejoras.\n" +
+
+        "```"
+      )
+      .setFooter({ text: "🤖 MECHANIC GUIDE SYSTEM" });
+
+    return message.channel.send({ embeds: [embed] });
+  }
 });
-
-// ─────────────────────────────
-// 🧠 HELPERS
-// ─────────────────────────────
-async function getUser(id) {
-  let user = await User.findOne({ userId: id });
-  if (!user) user = await User.create({ userId: id });
-  return user;
-}
-
-function isImmune(member) {
-  return IMMUNE_ROLES.some(r => member.roles.cache.has(r));
-}
 
 // ─────────────────────────────
 // ⚡ INTERACCIONES
@@ -194,24 +220,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (!target) return interaction.reply({ content: "usuario no encontrado", ephemeral: true });
 
-    const data = await getUser(target.id);
-
     if (action === "chain") {
-
-      if (isImmune(target)) {
-        return interaction.reply({ content: "🤖 objetivo inmune", ephemeral: true });
+      if (target.roles.cache.has(PRISON_ROLE)) {
+        return interaction.reply({ content: "ya está en prisión", ephemeral: true });
       }
 
       await target.roles.add(PRISON_ROLE);
       await buyer.roles.remove(TOKENS_ROLE);
 
-      data.prison = true;
-      await data.save();
-
       setTimeout(async () => {
         try {
           await target.roles.remove(PRISON_ROLE);
-          await User.updateOne({ userId: target.id }, { prison: false });
         } catch {}
       }, 30 * 60 * 1000);
 
@@ -221,7 +240,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (action === "release") {
       await target.roles.remove(PRISON_ROLE);
       await buyer.roles.remove(TOKENS_ROLE);
-      await User.updateOne({ userId: target.id }, { prison: false });
 
       return interaction.reply({ content: "liberado", ephemeral: true });
     }
@@ -230,13 +248,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await target.roles.add(IMMUNITY_ROLE);
       await buyer.roles.remove(TOKENS_ROLE);
 
-      data.immunity = true;
-      await data.save();
-
       setTimeout(async () => {
         try {
           await target.roles.remove(IMMUNITY_ROLE);
-          await User.updateOne({ userId: target.id }, { immunity: false });
         } catch {}
       }, 60 * 60 * 1000);
 
@@ -247,13 +261,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await target.roles.add(SHIELD_ROLE);
       await buyer.roles.remove(TOKENS_ROLE);
 
-      data.shield = true;
-      await data.save();
-
       setTimeout(async () => {
         try {
           await target.roles.remove(SHIELD_ROLE);
-          await User.updateOne({ userId: target.id }, { shield: false });
         } catch {}
       }, 60 * 60 * 1000);
 
