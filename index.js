@@ -37,18 +37,28 @@ const IMMUNE_ROLES = [
   "1427099549364781127"
 ];
 
-const prefix = ">";
-
 // ─────────────────────────────
-// 🧠 CONEXIÓN MONGO
+// 📦 MONGO MODEL
 // ─────────────────────────────
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("📦 MongoDB conectado"))
   .catch(err => console.log("❌ Mongo error:", err));
 
+const userSchema = new mongoose.Schema({
+  userId: String,
+  prison: { type: Boolean, default: false },
+  shield: { type: Boolean, default: false },
+  immunity: { type: Boolean, default: false },
+  renameUntil: { type: Number, default: 0 }
+});
+
+const User = mongoose.model("User", userSchema);
+
 // ─────────────────────────────
-// 🤖 MENSAJES
+// 🤖 BOT
 // ─────────────────────────────
+const prefix = ">";
+
 client.on("messageCreate", async (message) => {
 
   if (message.author.bot) return;
@@ -67,54 +77,16 @@ client.on("messageCreate", async (message) => {
   if (args[0] === "call" && args[1] === "mechanic") {
 
     if (!message.member.roles.cache.has(TOKENS_ROLE)) {
-      return message.reply(
-        "🤖 Parece que no tengo ningún motivo para ayudarte.\n" +
-        "vuelve cuando tengas un token o algo de mi interés."
-      );
+      return message.reply("🤖 vuelve cuando tengas un token.");
     }
 
-    const loading = await message.channel.send("🟣 ⚙️ iniciando sistema...");
-
-    await new Promise(r => setTimeout(r, 1200));
-    await loading.edit("🟣 🤖 conectando núcleo...");
-
-    await new Promise(r => setTimeout(r, 1200));
-    await loading.edit("🟣 🔓 cargando tienda...");
+    const loading = await message.channel.send("🟣 iniciando sistema...");
+    await new Promise(r => setTimeout(r, 2000));
 
     const embed = new EmbedBuilder()
       .setTitle("🛒 ⚙️ THE MECHANIC STORE")
-      .setDescription(
-        "```yaml\n" +
-
-        "🧷 ENCANDENAMIENTO\n" +
-        "🪙 COSTE: 1 TOKEN\n" +
-        "⏳ DURACIÓN: 30 min\n" +
-        "⚙️ EFECTO: Encierra a un usuario en prisión\n\n" +
-
-        "⛓️ LIBERACIÓN\n" +
-        "🪙 COSTE: 1 TOKEN\n" +
-        "⚙️ EFECTO: Elimina la prisión de un usuario\n\n" +
-
-        "✏️ RENOMBRAR USUARIO\n" +
-        "🪙 COSTE: 1 TOKEN\n" +
-        "⏳ DURACIÓN: 40 min\n" +
-        "⚙️ EFECTO: Cambia temporalmente el nickname\n\n" +
-
-        "🛡️ INMUNIDAD CD\n" +
-        "🪙 COSTE: 1 TOKEN\n" +
-        "⏳ DURACIÓN: 1 hora\n" +
-        "⚙️ EFECTO: Ignora slowmode / cooldown del sistema\n\n" +
-
-        "🛡️ ESCUDO [1 IMPACTO]\n" +
-        "🪙 COSTE: 1 TOKEN\n" +
-        "⏳ DURACIÓN: 1 hora\n" +
-        "⚙️ EFECTO: Bloquea el primer intento de ataque\n\n" +
-
-        "```"
-      )
-      .setColor(0x8b5cf6)
-      .setImage("https://cdn.discordapp.com/attachments/1402268718360297544/1519443095379513496/E42BDE84-B055-4A1C-B788-620B7DC904AD.gif")
-      .setFooter({ text: "🤖 MECHANIC SYSTEM ONLINE" });
+      .setDescription("Sistema cargado")
+      .setColor(0x8b5cf6);
 
     const menu = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
@@ -130,23 +102,21 @@ client.on("messageCreate", async (message) => {
         ])
     );
 
-    await loading.edit({
-      content: "",
-      embeds: [embed],
-      components: [menu]
-    });
+    await loading.edit({ content: "", embeds: [embed], components: [menu] });
   }
 });
 
 // ─────────────────────────────
-// 🧠 INMUNIDAD
+// 🧠 HELPERS MONGO
 // ─────────────────────────────
-function isImmune(member) {
-  return IMMUNE_ROLES.some(r => member.roles.cache.has(r));
+async function getUser(id) {
+  let user = await User.findOne({ userId: id });
+  if (!user) user = await User.create({ userId: id });
+  return user;
 }
 
 // ─────────────────────────────
-// ⚡ INTERACCIONES
+// ⚡ INTERACTIONS
 // ─────────────────────────────
 client.on(Events.InteractionCreate, async (interaction) => {
 
@@ -155,14 +125,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const option = interaction.values[0];
 
     if (option === "close") {
-      await interaction.update({
-        content: "🤖 cerrando sistema...",
-        embeds: [],
-        components: []
-      });
-
-      await new Promise(r => setTimeout(r, 1200));
-
+      await interaction.update({ content: "cerrando...", embeds: [], components: [] });
       return interaction.deleteReply();
     }
 
@@ -173,11 +136,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setMaxValues(1)
     );
 
-    return interaction.reply({
-      content: "elige usuario:",
-      components: [menu],
-      ephemeral: true
-    });
+    return interaction.reply({ content: "elige usuario:", components: [menu], ephemeral: true });
   }
 
   if (interaction.isUserSelectMenu()) {
@@ -190,65 +149,87 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const target = await guild.members.fetch(targetId).catch(() => null);
     const buyer = interaction.member;
 
-    if (!target) return interaction.reply({ content: "usuario no encontrado", ephemeral: true });
+    if (!target) return interaction.reply({ content: "no encontrado", ephemeral: true });
 
+    const data = await getUser(target.id);
+
+    // 🧷 ENCADENAR
     if (action === "chain") {
 
-      if (isImmune(target)) {
-        return interaction.reply({
-          content: "🤖 objetivo inmune",
-          ephemeral: true
-        });
+      if (target.roles.cache.has(PRISON_ROLE)) {
+        return interaction.reply({ content: "ya está en prisión", ephemeral: true });
       }
 
       await target.roles.add(PRISON_ROLE);
       await buyer.roles.remove(TOKENS_ROLE);
 
+      data.prison = true;
+      await data.save();
+
       setTimeout(async () => {
         try {
           const m = await guild.members.fetch(target.id);
           await m.roles.remove(PRISON_ROLE);
+
+          await User.updateOne({ userId: target.id }, { prison: false });
         } catch {}
       }, 30 * 60 * 1000);
 
       return interaction.reply({ content: "encadenado", ephemeral: true });
     }
 
+    // ⛓️ LIBERAR
     if (action === "release") {
+
       await target.roles.remove(PRISON_ROLE);
       await buyer.roles.remove(TOKENS_ROLE);
+
+      await User.updateOne({ userId: target.id }, { prison: false });
 
       return interaction.reply({ content: "liberado", ephemeral: true });
     }
 
+    // 🛡️ INMUNIDAD
     if (action === "immunity") {
+
       await target.roles.add(IMMUNITY_ROLE);
       await buyer.roles.remove(TOKENS_ROLE);
+
+      data.immunity = true;
+      await data.save();
 
       setTimeout(async () => {
         try {
           const m = await guild.members.fetch(target.id);
           await m.roles.remove(IMMUNITY_ROLE);
+          await User.updateOne({ userId: target.id }, { immunity: false });
         } catch {}
       }, 60 * 60 * 1000);
 
       return interaction.reply({ content: "inmunidad activa", ephemeral: true });
     }
 
+    // 🛡️ ESCUDO
     if (action === "shield") {
+
       await target.roles.add(SHIELD_ROLE);
       await buyer.roles.remove(TOKENS_ROLE);
+
+      data.shield = true;
+      await data.save();
 
       setTimeout(async () => {
         try {
           const m = await guild.members.fetch(target.id);
           await m.roles.remove(SHIELD_ROLE);
+          await User.updateOne({ userId: target.id }, { shield: false });
         } catch {}
       }, 60 * 60 * 1000);
 
       return interaction.reply({ content: "escudo activado", ephemeral: true });
     }
 
+    // ✏️ RENOMBRAR
     if (action === "rename") {
 
       const modal = new ModalBuilder()
@@ -270,30 +251,23 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (interaction.customId.startsWith("rename_")) {
 
-      const guild = interaction.guild;
-      const buyer = interaction.member;
-
       const targetId = interaction.customId.split("_")[1];
       const newName = interaction.fields.getTextInputValue("new_name");
 
-      const member = await guild.members.fetch(targetId);
+      const member = await interaction.guild.members.fetch(targetId);
+
       const old = member.nickname || member.user.username;
 
       await member.setNickname(newName);
 
       setTimeout(async () => {
         try {
-          const m = await guild.members.fetch(targetId);
+          const m = await interaction.guild.members.fetch(targetId);
           await m.setNickname(old);
         } catch {}
       }, 40 * 60 * 1000);
 
-      await buyer.roles.remove(TOKENS_ROLE);
-
-      return interaction.reply({
-        content: "renombrado aplicado",
-        ephemeral: true
-      });
+      await interaction.reply({ content: "renombrado", ephemeral: true });
     }
   }
 });
