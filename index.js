@@ -47,7 +47,7 @@ mongoose.connect(process.env.MONGO_URI)
 const prefix = ">";
 
 // ─────────────────────────────
-// 🤖 MESSAGE HANDLER
+// 🤖 BOT
 // ─────────────────────────────
 client.on("messageCreate", async (message) => {
 
@@ -65,7 +65,9 @@ client.on("messageCreate", async (message) => {
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
 
-  // ───────── TIENDA ─────────
+  // ─────────────────────────────
+  // 🛒 TIENDA
+  // ─────────────────────────────
   if (args[0] === "call" && args[1] === "mechanic") {
 
     if (!message.member.roles.cache.has(TOKENS_ROLE)) {
@@ -92,7 +94,7 @@ client.on("messageCreate", async (message) => {
         "✏️ RENOMBRAR USUARIO\n" +
         "🪙 COSTE: 1 TOKEN\n" +
         "⏳ DURACIÓN: 40 min\n" +
-        "⚙️ EFECTO: Cambia nickname temporalmente\n\n" +
+        "⚙️ EFECTO: Cambia el nickname con nombre personalizado\n\n" +
 
         "🛡️ INMUNIDAD CD\n" +
         "🪙 COSTE: 1 TOKEN\n" +
@@ -107,6 +109,7 @@ client.on("messageCreate", async (message) => {
         "```"
       )
       .setColor(0x8b5cf6)
+      .setImage("https://cdn.discordapp.com/attachments/1402268718360297544/1519443095379513496/E42BDE84-B055-4A1C-B788-620B7DC904AD.gif")
       .setFooter({ text: "🤖 MECHANIC SYSTEM ONLINE" });
 
     const menu = new ActionRowBuilder().addComponents(
@@ -126,7 +129,9 @@ client.on("messageCreate", async (message) => {
     await loading.edit({ content: "", embeds: [embed], components: [menu] });
   }
 
-  // ───────── HELP ─────────
+  // ─────────────────────────────
+  // 📘 HELP
+  // ─────────────────────────────
   if (args[0] === "mechanic" && args[1] === "help") {
 
     const embed = new EmbedBuilder()
@@ -140,7 +145,7 @@ client.on("messageCreate", async (message) => {
         ">mechanic help → guía del sistema\n\n" +
 
         "🪙 TOKENS\n" +
-        "Moneda del sistema usada para comprar ítems.\n\n" +
+        "Moneda usada para comprar ítems.\n\n" +
 
         "🧷 ENCANDENAMIENTO\n" +
         "Prisión de 30 minutos a un usuario.\n\n" +
@@ -152,9 +157,9 @@ client.on("messageCreate", async (message) => {
         "Cambia nickname temporalmente.\n\n" +
 
         "🛡️ INMUNIDAD CD\n" +
-        "Ignora cooldown del sistema por 1 hora.\n\n" +
+        "Ignora cooldown por 1 hora.\n\n" +
 
-        "🛡️ ESCUDO\n" +
+        "🛡️ ESCUDO [1 IMPACTO]\n" +
         "Bloquea un ataque y se consume.\n\n" +
 
         "📡 SISTEMA\n" +
@@ -172,107 +177,39 @@ client.on("messageCreate", async (message) => {
 });
 
 // ─────────────────────────────
-// ⚡ INTERACTIONS
+// ⚡ INTERACCIONES
 // ─────────────────────────────
 client.on(Events.InteractionCreate, async (interaction) => {
 
   if (!interaction.isStringSelectMenu() && !interaction.isModalSubmit()) return;
 
-  // ───────── SHOP MENU ─────────
+  // ───── SHOP MENU ─────
   if (interaction.isStringSelectMenu() && interaction.customId === "shop_menu") {
 
     const option = interaction.values[0];
 
     if (option === "close") {
-      await interaction.update({
+      return interaction.update({
         content: "🤖 cerrando sistema...",
         embeds: [],
         components: []
       });
-      return interaction.deleteReply();
     }
 
-    const menu = new ActionRowBuilder().addComponents(
-      new StringSelectMenuBuilder()
-        .setCustomId(`user_${option}`)
-        .setPlaceholder("selecciona usuario")
-        .addOptions([{ label: "Seleccionar usuario", value: "pick", emoji: "👤" }])
-    );
-
-    return interaction.reply({
-      content: "👤 selecciona usuario:",
-      components: [menu],
-      ephemeral: true
-    });
-  }
-
-  // ───────── USER SELECT ─────────
-  if (interaction.isStringSelectMenu() && interaction.customId.startsWith("user_")) {
-
-    const action = interaction.customId.split("_")[1];
-    const targetId = interaction.values[0];
-
-    const target = await interaction.guild.members.fetch(targetId).catch(() => null);
-    if (!target) return interaction.reply({ content: "usuario no encontrado", ephemeral: true });
-
-    const isImmune = IMMUNE_ROLES.some(r => target.roles.cache.has(r));
-
-    if (action === "chain") {
-
-      if (isImmune) return interaction.reply({ content: "🤖 inmune", ephemeral: true });
-
-      await target.roles.add(PRISON_ROLE);
-      await interaction.member.roles.remove(TOKENS_ROLE);
-
-      setTimeout(async () => {
-        try { await target.roles.remove(PRISON_ROLE); } catch {}
-      }, 30 * 60 * 1000);
-
-      return interaction.reply({ content: "🧷 encadenado", ephemeral: true });
-    }
-
-    if (action === "release") {
-      await target.roles.remove(PRISON_ROLE);
-      await interaction.member.roles.remove(TOKENS_ROLE);
-      return interaction.reply({ content: "⛓️ liberado", ephemeral: true });
-    }
-
-    if (action === "immunity") {
-      await target.roles.add(IMMUNITY_ROLE);
-      await interaction.member.roles.remove(TOKENS_ROLE);
-
-      setTimeout(async () => {
-        try { await target.roles.remove(IMMUNITY_ROLE); } catch {}
-      }, 60 * 60 * 1000);
-
-      return interaction.reply({ content: "🛡️ inmunidad activada", ephemeral: true });
-    }
-
-    if (action === "shield") {
-      await target.roles.add(SHIELD_ROLE);
-      await interaction.member.roles.remove(TOKENS_ROLE);
-
-      setTimeout(async () => {
-        try { await target.roles.remove(SHIELD_ROLE); } catch {}
-      }, 60 * 60 * 1000);
-
-      return interaction.reply({ content: "🛡️ escudo activado", ephemeral: true });
-    }
-
-    // ───────── RENAMING PANEL ─────────
-    if (action === "rename") {
+    // 🔥 RENOMBRAR (FIX)
+    if (option === "rename") {
 
       const modal = new ModalBuilder()
         .setCustomId("rename_modal")
-        .setTitle("✏️ Panel de Renombrado");
+        .setTitle("✏️ Renombrar usuario");
 
-      const userInput = new TextInputBuilder()
-        .setCustomId("target_user")
+      const target = new TextInputBuilder()
+        .setCustomId("target")
         .setLabel("Usuario (ID o @mención)")
         .setStyle(TextInputStyle.Short)
         .setRequired(true);
 
-      const nameInput = new TextInputBuilder()
+      const name = new TextInputBuilder()
         .setCustomId("new_name")
         .setLabel("Nuevo nombre")
         .setStyle(TextInputStyle.Short)
@@ -280,34 +217,46 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setMaxLength(32);
 
       modal.addComponents(
-        new ActionRowBuilder().addComponents(userInput),
-        new ActionRowBuilder().addComponents(nameInput)
+        new ActionRowBuilder().addComponents(target),
+        new ActionRowBuilder().addComponents(name)
       );
 
       return interaction.showModal(modal);
     }
+
+    return interaction.reply({
+      content: "⚠️ función en modo estable",
+      ephemeral: true
+    });
   }
 
-  // ───────── MODAL HANDLER ─────────
+  // ─────────────────────────────
+  // ✏️ MODAL RENAMER
+  // ─────────────────────────────
   if (interaction.isModalSubmit() && interaction.customId === "rename_modal") {
 
-    const rawUser = interaction.fields.getTextInputValue("target_user");
+    const raw = interaction.fields.getTextInputValue("target");
     const newName = interaction.fields.getTextInputValue("new_name");
 
-    const id = rawUser.replace(/[<@!>]/g, "");
+    const id = raw.replace(/[<@!>]/g, "");
     const target = await interaction.guild.members.fetch(id).catch(() => null);
 
     if (!target) {
-      return interaction.reply({ content: "❌ usuario no encontrado", ephemeral: true });
+      return interaction.reply({
+        content: "❌ usuario no encontrado",
+        ephemeral: true
+      });
     }
 
-    const oldName = target.nickname || target.user.username;
+    const old = target.nickname || target.user.username;
 
     await target.setNickname(newName);
     await interaction.member.roles.remove(TOKENS_ROLE);
 
     setTimeout(async () => {
-      try { await target.setNickname(oldName); } catch {}
+      try {
+        await target.setNickname(old);
+      } catch {}
     }, 40 * 60 * 1000);
 
     return interaction.reply({
