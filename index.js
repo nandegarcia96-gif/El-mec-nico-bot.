@@ -23,7 +23,7 @@ const client = new Client({
   ]
 });
 
-// 🔐 RESTRICCIÓN CANAL
+// 🔐 CANAL PERMITIDO
 const ALLOWED_CHANNEL = "1519418226973347992";
 
 // 🔐 ROLES
@@ -64,7 +64,6 @@ client.on("messageCreate", async (message) => {
 
   if (message.author.bot) return;
 
-  // 📌 SOLO CANAL PERMITIDO
   if (message.channel.id !== ALLOWED_CHANNEL) return;
 
   if (message.mentions.has(client.user)) {
@@ -191,7 +190,7 @@ client.on("messageCreate", async (message) => {
 // ─────────────────────────────
 client.on(Events.InteractionCreate, async (interaction) => {
 
-  // 🧠 SELECT MENU PRINCIPAL
+  // 🛒 TIENDA
   if (interaction.isStringSelectMenu() && interaction.customId === "shop_menu") {
 
     const option = interaction.values[0];
@@ -205,22 +204,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.deleteReply();
     }
 
-    // 👉 CONFIRMACIÓN
-    const menu = new ActionRowBuilder().addComponents(
-      new UserSelectMenuBuilder()
-        .setCustomId(`confirm_${option}`)
-        .setPlaceholder("selecciona usuario")
-        .setMaxValues(1)
-    );
-
     return interaction.reply({
       content: "⚠️ confirma usuario para continuar",
-      components: [menu],
+      components: [
+        new ActionRowBuilder().addComponents(
+          new UserSelectMenuBuilder()
+            .setCustomId(`confirm_${option}`)
+            .setPlaceholder("selecciona usuario")
+            .setMaxValues(1)
+        )
+      ],
       ephemeral: true
     });
   }
 
-  // 👤 CONFIRM STEP
+  // 👤 CONFIRM
   if (interaction.isUserSelectMenu() && interaction.customId.startsWith("confirm_")) {
 
     const action = interaction.customId.split("_")[1];
@@ -242,7 +240,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     });
   }
 
-  // ⚡ EJECUCIÓN FINAL
+  // ⚡ EXECUTE (FIX INMUNIDAD AQUÍ)
   if (interaction.isStringSelectMenu() && interaction.customId.startsWith("execute_")) {
 
     const [, action, targetId] = interaction.customId.split("_");
@@ -262,8 +260,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.update({ content: "usuario no encontrado", components: [] });
     }
 
-    // 🧷 ENC
+    // 🧷 ENCANDENAMIENTO (FIX INMUNIDAD)
     if (action === "chain") {
+
+      const isImmune = IMMUNE_ROLES.some(r => target.roles.cache.has(r));
+
+      if (isImmune) {
+        return interaction.update({
+          content: "🤖 este usuario es inmune al encarcelamiento",
+          components: []
+        });
+      }
+
       await target.roles.add(PRISON_ROLE);
       await buyer.roles.remove(TOKENS_ROLE);
 
@@ -274,15 +282,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.update({ content: "🧷 encadenado", components: [] });
     }
 
-    // ⛓️ LIBERACIÓN
     if (action === "release") {
       await target.roles.remove(PRISON_ROLE);
       await buyer.roles.remove(TOKENS_ROLE);
-
       return interaction.update({ content: "⛓️ liberado", components: [] });
     }
 
-    // 🛡️ INMUNIDAD
     if (action === "immunity") {
       await target.roles.add(IMMUNITY_ROLE);
       await buyer.roles.remove(TOKENS_ROLE);
@@ -294,7 +299,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.update({ content: "🛡️ inmunidad activada", components: [] });
     }
 
-    // 🛡️ ESCUDO
     if (action === "shield") {
       await target.roles.add(SHIELD_ROLE);
       await buyer.roles.remove(TOKENS_ROLE);
@@ -306,7 +310,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.update({ content: "🛡️ escudo activado", components: [] });
     }
 
-    // ✏️ RENOMBRAR
     if (action === "rename") {
 
       const old = target.nickname || target.user.username;
