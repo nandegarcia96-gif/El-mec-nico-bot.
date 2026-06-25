@@ -51,18 +51,29 @@ mongoose.connect(process.env.MONGO_URI)
 
 const prefix = ">";
 
-// ⏱️ COOLDOWN GLOBAL
+// ⏱️ COOLDOWN
 const cooldown = new Map();
 
-// ⏱️ TOKENS LIMIT (3 por hora)
-const tokenUsage = new Map();
-
-// 🎲 nombres random
+// 🎲 RANDOM NAMES
 const randomNames = [
-  "Sombra", "Fénix", "Lobo", "Rayo", "Víbora",
-  "Tigre", "Ángel", "Demonio", "Nómada", "Titan",
-  "Ghost", "Rey", "Caos", "Zero", "Nova"
+  "Sombra", "Fénix", "Rayo", "Titán", "Nómada",
+  "Cazador", "Fantasma", "Vortex", "Draco", "Orion",
+  "Lobo", "Ángel", "Demonio", "Neón", "Eco"
 ];
+
+// ─────────────────────────────
+// 🔥 TOKEN CONSUMER (FIX PRINCIPAL)
+// ─────────────────────────────
+async function consumeToken(member) {
+  if (!member.roles.cache.has(TOKENS_ROLE)) return false;
+
+  try {
+    await member.roles.remove(TOKENS_ROLE);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // ─────────────────────────────
 // 🤖 MESSAGE SYSTEM
@@ -90,19 +101,22 @@ client.on("messageCreate", async (message) => {
   if (args[0] === "call" && args[1] === "mechanic") {
 
     if (!message.member.roles.cache.has(TOKENS_ROLE)) {
-      return message.reply("🚫 No tienes tokens para acceder a la tienda.");
+      return message.reply("🤖 vuelve cuando tengas un token.");
     }
+
+    const loading = await message.channel.send("🟣 ⚙️ iniciando sistema...");
+    await new Promise(r => setTimeout(r, 1200));
 
     const embed = new EmbedBuilder()
       .setTitle("🛒 ⚙️ THE MECHANIC STORE")
       .setDescription(
         "```yaml\n" +
-        "🧷 ENCANDENAMIENTO\n🪙 1 TOKEN\n⏳ 30 min\n⚙️ Encierra a un usuario en prisión\n\n" +
-        "⛓️ LIBERACIÓN\n🪙 1 TOKEN\n⚙️ Libera a un usuario de prisión\n\n" +
-        "✏️ RENOMBRAR USUARIO\n🪙 1 TOKEN\n⏳ 40 min\n⚙️ Cambia el nickname temporalmente\n\n" +
-        "🎲 NOMBRES ALEATORIOS\n🪙 1 TOKEN\n⏳ 1 min\n⚙️ Cambia el nombre continuamente\n\n" +
-        "🛡️ INMUNIDAD CD\n🪙 1 TOKEN\n⏳ 1 HORA\n⚙️ Ignora cooldown\n\n" +
-        "🛡️ ESCUDO\n🪙 1 TOKEN\n⏳ 1 HORA\n⚙️ Bloquea un ataque\n" +
+        "🧷 ENCANDENAMIENTO → 30 min prisión\n" +
+        "⛓️ LIBERACIÓN → elimina prisión\n" +
+        "✏️ RENOMBRAR → nickname temporal\n" +
+        "🎲 RANDOM NAME → cambio constante\n" +
+        "🛡️ INMUNIDAD CD → bypass\n" +
+        "🛡️ ESCUDO → bloquea ataque\n" +
         "```"
       )
       .setColor(0x8b5cf6)
@@ -117,14 +131,14 @@ client.on("messageCreate", async (message) => {
           { label: "Encadenar", value: "chain", emoji: "🧷" },
           { label: "Liberación", value: "release", emoji: "⛓️‍💥" },
           { label: "Renombrar", value: "rename", emoji: "✏️" },
-          { label: "Nombres aleatorios", value: "random", emoji: "🎲" },
+          { label: "Random Name", value: "randomname", emoji: "🎲" },
           { label: "Inmunidad CD", value: "immunity", emoji: "🛡️" },
           { label: "Escudo", value: "shield", emoji: "🛡️" },
           { label: "Cerrar", value: "close", emoji: "❌" }
         ])
     );
 
-    await message.channel.send({ embeds: [embed], components: [menu] });
+    await loading.edit({ embeds: [embed], components: [menu] });
   }
 });
 
@@ -137,21 +151,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
       !interaction.isUserSelectMenu() &&
       !interaction.isModalSubmit()) return;
 
-  // 🛑 BLOQUEO SI NO TIENE TOKEN
-  if (interaction.member && !interaction.member.roles.cache.has(TOKENS_ROLE)) {
-    return interaction.reply({
-      content: "🚫 necesitas token para usar esto",
-      ephemeral: true
-    });
-  }
-
-  // ───────── MENU ─────────
+  // ───── SHOP MENU ─────
   if (interaction.isStringSelectMenu() && interaction.customId === "shop_menu") {
 
-    const option = interaction.values[0];
-
-    if (option === "close") {
-      return interaction.update({ content: "cerrado", components: [], embeds: [] });
+    if (interaction.values[0] === "close") {
+      return interaction.update({ content: "cerrado", embeds: [], components: [] });
     }
 
     return interaction.reply({
@@ -159,8 +163,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       components: [
         new ActionRowBuilder().addComponents(
           new UserSelectMenuBuilder()
-            .setCustomId(`user_${option}`)
-            .setPlaceholder("selecciona usuario")
+            .setCustomId(`user_${interaction.values[0]}`)
             .setMaxValues(1)
         )
       ],
@@ -168,14 +171,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
     });
   }
 
-  // ───────── USER SELECT ─────────
+  // ───── USER SELECT ─────
   if (interaction.isUserSelectMenu()) {
 
     const action = interaction.customId.split("_")[1];
     const targetId = interaction.values[0];
 
-    const guild = interaction.guild;
-    const target = await guild.members.fetch(targetId).catch(() => null);
+    const target = await interaction.guild.members.fetch(targetId).catch(() => null);
     const buyer = interaction.member;
 
     if (!target) return interaction.reply({ content: "no encontrado", ephemeral: true });
@@ -183,35 +185,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const isBooster = target.roles.cache.has(BOOSTER_ROLE);
     const immune = IMMUNE_ROLES.some(r => target.roles.cache.has(r));
 
-    if (isBooster && action === "rename") {
-      return interaction.reply({
-        content: "🚫 no puedes afectar a boosters",
-        ephemeral: true
-      });
+    if (isBooster && (action === "rename" || action === "randomname")) {
+      return interaction.reply({ content: "🚫 booster protegido", ephemeral: true });
     }
 
-    // ───── TOKEN LIMIT ─────
-    const now = Date.now();
-    const userData = tokenUsage.get(buyer.id) || { count: 0, reset: now + 3600000 };
-
-    if (now > userData.reset) {
-      userData.count = 0;
-      userData.reset = now + 3600000;
-    }
-
-    if (userData.count >= 3) {
-      return interaction.reply({
-        content: "🚫 límite de tokens (3 por hora)",
-        ephemeral: true
-      });
-    }
-
-    userData.count++;
-    tokenUsage.set(buyer.id, userData);
-
-    // ───── ACTIONS ─────
+    // ───── CHAIN ─────
     if (action === "chain") {
       if (immune) return interaction.reply({ content: "inmune", ephemeral: true });
+
+      const ok = await consumeToken(buyer);
+      if (!ok) return interaction.reply({ content: "sin token", ephemeral: true });
 
       await target.roles.add(PRISON_ROLE);
       setTimeout(() => target.roles.remove(PRISON_ROLE).catch(() => {}), 30 * 60000);
@@ -219,46 +202,35 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.reply({ content: "encadenado", ephemeral: true });
     }
 
+    // ───── RELEASE ─────
     if (action === "release") {
+      const ok = await consumeToken(buyer);
+      if (!ok) return interaction.reply({ content: "sin token", ephemeral: true });
+
       await target.roles.remove(PRISON_ROLE);
       return interaction.reply({ content: "liberado", ephemeral: true });
     }
 
+    // ───── IMMUNITY ─────
     if (action === "immunity") {
+      const ok = await consumeToken(buyer);
+      if (!ok) return interaction.reply({ content: "sin token", ephemeral: true });
+
       await target.roles.add(IMMUNITY_ROLE);
       setTimeout(() => target.roles.remove(IMMUNITY_ROLE).catch(() => {}), 60 * 60000);
+
       return interaction.reply({ content: "inmunidad", ephemeral: true });
     }
 
+    // ───── SHIELD ─────
     if (action === "shield") {
+      const ok = await consumeToken(buyer);
+      if (!ok) return interaction.reply({ content: "sin token", ephemeral: true });
+
       await target.roles.add(SHIELD_ROLE);
       setTimeout(() => target.roles.remove(SHIELD_ROLE).catch(() => {}), 60 * 60000);
+
       return interaction.reply({ content: "escudo", ephemeral: true });
-    }
-
-    // ───── RANDOM NAMES LOOP ─────
-    if (action === "random") {
-
-      const old = target.nickname || target.user.username;
-      let i = 0;
-
-      const interval = setInterval(async () => {
-        const name = randomNames[Math.floor(Math.random() * randomNames.length)];
-        try {
-          await target.setNickname(name);
-        } catch {}
-        i++;
-        if (i >= 3) clearInterval(interval);
-      }, 20000);
-
-      setTimeout(() => {
-        target.setNickname(old).catch(() => {});
-      }, 60000);
-
-      return interaction.reply({
-        content: "🎲 nombres aleatorios activados",
-        ephemeral: true
-      });
     }
 
     // ───── RENAMER ─────
@@ -277,17 +249,49 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       return interaction.showModal(modal);
     }
+
+    // ───── RANDOM NAME (20s loop) ─────
+    if (action === "randomname") {
+
+      const ok = await consumeToken(buyer);
+      if (!ok) return interaction.reply({ content: "sin token", ephemeral: true });
+
+      const old = target.nickname || target.user.username;
+
+      let i = 0;
+      const interval = setInterval(async () => {
+        const name = randomNames[Math.floor(Math.random() * randomNames.length)];
+        try {
+          await target.setNickname(name);
+        } catch {}
+        i++;
+        if (i >= 3) clearInterval(interval);
+      }, 20000);
+
+      setTimeout(() => {
+        target.setNickname(old).catch(() => {});
+      }, 60000);
+
+      return interaction.reply({
+        content: "🎲 random activo",
+        ephemeral: true
+      });
+    }
   }
 
-  // ───────── MODAL ─────────
+  // ───── MODAL ─────
   if (interaction.isModalSubmit() && interaction.customId.startsWith("rename_")) {
 
     const targetId = interaction.customId.split("_")[1];
     const newName = interaction.fields.getTextInputValue("new_name");
 
     const target = await interaction.guild.members.fetch(targetId).catch(() => null);
+    const buyer = interaction.member;
 
     if (!target) return interaction.reply({ content: "no encontrado", ephemeral: true });
+
+    const ok = await consumeToken(buyer);
+    if (!ok) return interaction.reply({ content: "sin token", ephemeral: true });
 
     const old = target.nickname || target.user.username;
 
@@ -298,7 +302,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }, 40 * 60000);
 
     return interaction.reply({
-      content: `✏️ cambiado a **${newName}**`,
+      content: "cambiado",
       ephemeral: true
     });
   }
