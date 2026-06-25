@@ -11,6 +11,9 @@ const {
   TextInputStyle
 } = require("discord.js");
 
+// 📦 MONGODB
+const mongoose = require("mongoose");
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -26,7 +29,7 @@ const PRISON_ROLE = "1459458843816759412";
 const IMMUNITY_ROLE = "1515011976621854790";
 const SHIELD_ROLE = "ID_DEL_ROL_ESCUDO";
 
-// 🛡️ INMUNIDAD A PRISIÓN (ROLES PROTEGIDOS)
+// 🛡️ INMUNIDAD A PRISIÓN
 const IMMUNE_ROLES = [
   "1465082323220562013",
   "1426385179575975936",
@@ -57,7 +60,6 @@ client.on("messageCreate", async (message) => {
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
 
-  // 🛒 TIENDA
   if (args[0] === "call" && args[1] === "mechanic") {
 
     if (!message.member.roles.cache.has(TOKENS_ROLE)) {
@@ -75,28 +77,10 @@ client.on("messageCreate", async (message) => {
     await new Promise(r => setTimeout(r, 1200));
     await loading.edit("🟣 🔓 cargando tienda...");
 
-    await new Promise(r => setTimeout(r, 900));
-
     const embed = new EmbedBuilder()
       .setTitle("🛒 ⚙️ THE MECHANIC STORE")
-      .setDescription(
-        "```yaml\n" +
-
-        "🧷 ENCANDENAMIENTO\n🪙 1 TOKEN\n⛓️ 30 min\n\n" +
-
-        "⛓️ LIBERACIÓN\n🪙 1 TOKEN\n⛓️💥 elimina prisión\n\n" +
-
-        "✏️ RENOMBRAR USUARIO\n🪙 1 TOKEN\n🤖 cambio temporal 40 min\n\n" +
-
-        "🛡️ INMUNIDAD CD\n🪙 1 TOKEN\n🤖 ignora slowmode del sistema\n⏳ 1 hora\n\n" +
-
-        "🛡️ ESCUDO [1 IMPACTO]\n🪙 1 TOKEN\n💥 bloquea 1 intento de ítem\n⏳ 1 hora\n" +
-
-        "```"
-      )
-      .setColor(0x8b5cf6)
-      .setImage("https://cdn.discordapp.com/attachments/1402268718360297544/1519443095379513496/E42BDE84-B055-4A1C-B788-620B7DC904AD.gif")
-      .setFooter({ text: "🤖 system online" });
+      .setDescription("Sistema cargado...")
+      .setColor(0x8b5cf6);
 
     const menu = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
@@ -121,7 +105,7 @@ client.on("messageCreate", async (message) => {
 });
 
 // ─────────────────────────────
-// 🧠 INMUNIDAD A PRISIÓN
+// 🧠 INMUNIDAD
 // ─────────────────────────────
 function isImmune(member) {
   return IMMUNE_ROLES.some(r => member.roles.cache.has(r));
@@ -132,26 +116,18 @@ function isImmune(member) {
 // ─────────────────────────────
 client.on(Events.InteractionCreate, async (interaction) => {
 
-  // ❌ CERRAR TIENDA
   if (interaction.isStringSelectMenu()) {
 
     const option = interaction.values[0];
 
     if (option === "close") {
-
       await interaction.update({
         content: "🤖 cerrando sistema...",
         embeds: [],
         components: []
       });
 
-      await new Promise(r => setTimeout(r, 1200));
-
-      await interaction.editReply({
-        content: "🤖 apagando interfaz..."
-      });
-
-      await new Promise(r => setTimeout(r, 1200));
+      await new Promise(r => setTimeout(r, 1000));
 
       return interaction.deleteReply();
     }
@@ -170,40 +146,28 @@ client.on(Events.InteractionCreate, async (interaction) => {
     });
   }
 
-  // 👤 USER SELECT
   if (interaction.isUserSelectMenu()) {
 
     const [_, action] = interaction.customId.split("_");
 
     const targetId = interaction.values[0];
     const guild = interaction.guild;
-    const buyer = interaction.member;
 
     const target = await guild.members.fetch(targetId).catch(() => null);
+    const buyer = interaction.member;
+
     if (!target) return interaction.reply({ content: "usuario no encontrado", ephemeral: true });
 
-    // 🛡️ ESCUDO 1 IMPACTO
-    if (target.roles.cache.has(SHIELD_ROLE)) {
-
-      await target.roles.remove(SHIELD_ROLE).catch(() => {});
-
-      return interaction.reply({
-        content: "🛡️ escudo activado, efecto cancelado",
-        ephemeral: true
-      });
-    }
-
-    // 🧷 ENC
     if (action === "chain") {
-
       if (isImmune(target)) {
         return interaction.reply({
-          content: "🤖 el objetivo es inmune al encarcelamiento",
+          content: "🤖 objetivo inmune",
           ephemeral: true
         });
       }
 
       await target.roles.add(PRISON_ROLE);
+      await buyer.roles.remove(TOKENS_ROLE);
 
       setTimeout(async () => {
         try {
@@ -212,24 +176,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
         } catch {}
       }, 30 * 60 * 1000);
 
-      await buyer.roles.remove(TOKENS_ROLE);
-
       return interaction.reply({ content: "encadenado", ephemeral: true });
     }
 
-    // ⛓️ LIBERACIÓN
     if (action === "release") {
-
       await target.roles.remove(PRISON_ROLE);
       await buyer.roles.remove(TOKENS_ROLE);
 
       return interaction.reply({ content: "liberado", ephemeral: true });
     }
 
-    // 🛡️ INMUNIDAD CD
     if (action === "immunity") {
-
       await target.roles.add(IMMUNITY_ROLE);
+      await buyer.roles.remove(TOKENS_ROLE);
 
       setTimeout(async () => {
         try {
@@ -238,15 +197,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
         } catch {}
       }, 60 * 60 * 1000);
 
-      await buyer.roles.remove(TOKENS_ROLE);
-
       return interaction.reply({ content: "inmunidad activa", ephemeral: true });
     }
 
-    // 🛡️ ESCUDO
     if (action === "shield") {
-
       await target.roles.add(SHIELD_ROLE);
+      await buyer.roles.remove(TOKENS_ROLE);
 
       setTimeout(async () => {
         try {
@@ -255,12 +211,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         } catch {}
       }, 60 * 60 * 1000);
 
-      await buyer.roles.remove(TOKENS_ROLE);
-
       return interaction.reply({ content: "escudo activado", ephemeral: true });
     }
 
-    // ✏️ RENOMBRAR
     if (action === "rename") {
 
       const modal = new ModalBuilder()
@@ -278,7 +231,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
   }
 
-  // 📝 MODAL RENOMBRAR
   if (interaction.isModalSubmit()) {
 
     if (interaction.customId.startsWith("rename_")) {
@@ -290,7 +242,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const newName = interaction.fields.getTextInputValue("new_name");
 
       const member = await guild.members.fetch(targetId);
-
       const old = member.nickname || member.user.username;
 
       await member.setNickname(newName);
@@ -312,6 +263,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
+// 🔌 MONGO CONNECT
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("📦 MongoDB conectado"))
+  .catch(err => console.log("❌ Mongo error:", err));
+
+// 🤖 READY
 client.once(Events.ClientReady, () => {
   console.log("🤖 mechanic online");
 });
