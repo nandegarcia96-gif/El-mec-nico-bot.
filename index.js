@@ -112,6 +112,9 @@ client.on("messageCreate", async (message) => {
       .setDescription(
         "```yaml\n" +
         "🧷 ENCANDENAMIENTO → 30 min prisión\n" +
+        "🪙 1 TOKEN\n" +
+        "ENCARCELA USUARIO A TU ELECCION\n" +
+        
         "⛓️ LIBERACIÓN → elimina prisión\n" +
         "✏️ RENOMBRAR → nickname temporal\n" +
         "🎲 RANDOM NAME → cambio constante\n" +
