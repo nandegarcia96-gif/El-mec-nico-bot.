@@ -108,50 +108,51 @@ client.on("messageCreate", async (message) => {
     await new Promise(r => setTimeout(r, 1200));
 
     const embed = new EmbedBuilder()
-      .setTitle("🛒 ⚙️ THE MECHANIC STORE")
-      .setDescription(
-        "```yaml\n" +
-        "🧷 ENCANDENAMIENTO → 30 min prisión\n" +
-        
-        "🪙 1 TOKEN\n" +
-        
-        "ENCARCELA USUARIO A TU ELECCION\n" +
-        
-        "⛓️ LIBERACIÓN → Instantanea\n" +
+  .setTitle("🛒 ⚙️ THE MECHANIC STORE")
+  .setDescription(
+    "```yaml\n" +
 
-        "🪙 1 TOKEN\n" +
+    "🔗 ENCANDENAMIENTO\n" +
+    "🪙 1 TOKEN\n" +
+    "⏳ 30 min\n" +
+    "⚙️ bloquea acceso a interacciones básicas del sistema\n" +
+    "🔗 efecto temporal de restricción de canales\n" +
 
-        "LIBERAR A UN USUARIO DE LA CARCEL DE TU ELECCION\n" +
-      
-        "✏️ RENOMBRAR → nickname temporal\n" +
+    "⛓️ LIBERACIÓN\n" +
+    "🪙 1 TOKEN\n" +
+    "⚙️ elimina el efecto de encadenamiento\n" +
+    "⛓️‍💥 restaura el acceso normal del usuario\n\n" +
 
-        "🪙 1 TOKEN\n" +
+    "✏️ RENOMBRAR USUARIO\n" +
+    "🪙 1 TOKEN\n" +
+    "⏳ 40 min\n" +
+    "⚙️ cambia el nickname del usuario temporalmente\n" +
+    "✨ vuelve al nombre original al finalizar\n\n" +
 
-        "RENOMBRARAS A GUSTO A UN USUARIO DE TU ELECCION POR 15 MINUTOS\n" +
-      
-        "🎲 RANDOM NAME → cambio constante\n" +
+    "🎲 NOMBRES ALEATORIOS\n" +
+    "🪙 1 TOKEN\n" +
+    "⏳ 1 min\n" +
+    "⚙️ cambia el nombre del usuario constantemente\n" +
+    "💿 cada 10–15 segundos cambia a un nombre\n" +
 
-        "🪙 1 TOKEN\n" +
+    "🛡️ INMUNIDAD CD\n" +
+    "🪙 1 TOKEN\n" +
+    "⏳ 1 HORA\n" +
+    "⚙️ ignora el cooldown del servidor\n" +
+    "💬 permite uso continuo de acciones\n\n" +
 
-        "CAMBIA EL APODO DE MANERA ALEATORIA DE UN USUARIO POR 1 MINUTO\n" +
-      
-        "🛡️ INMUNIDAD CD → bypass\n" +
+    "🛡️ ESCUDO\n" +
+    "🪙 1 TOKEN\n" +
+    "⏳ 1 HORA\n" +
+    "⚙️ bloquea 1 acción recibida del sistema\n" +
+    "🛡️ protege contra un efecto\n" +
 
-        "🪙 1 TOKEN\n" +
-
-        "SERAS INMUNE TEMPORALMENTE AL MODO LENTO DE 30 MINUTOS A 1 HORA\n" +
-      
-        "🛡️ ESCUDO → bloquea ataque\n" +
-
-        "🪙 1 TOKEN\n" +
-
-        "ESTARAS PROTEGIDO DE CUALQUIER EFECTO 1 VEZ\n" +
-        "```"
-      )
-      .setColor(0x8b5cf6)
-      .setImage("https://cdn.discordapp.com/attachments/1402268718360297544/1519443095379513496/E42BDE84-B055-4A1C-B788-620B7DC904AD.gif")
-      .setFooter({ text: "🤖 MECHANIC SYSTEM ONLINE" });
-
+    "```"
+  )
+  .setColor(0x8b5cf6)
+  .setImage("https://cdn.discordapp.com/attachments/1402268718360297544/1519443095379513496/E42BDE84-B055-4A1C-B788-620B7DC904AD.gif")
+  .setFooter({ text: "🤖 MECHANIC SYSTEM ONLINE" });
+    
     const menu = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId("shop_menu")
