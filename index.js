@@ -48,7 +48,7 @@ mongoose.connect(process.env.MONGO_URI)
 const prefix = ">";
 
 // ─────────────────────────────
-// 🤖 BOT
+// 🤖 MENSAJES
 // ─────────────────────────────
 client.on("messageCreate", async (message) => {
 
@@ -139,10 +139,10 @@ client.on("messageCreate", async (message) => {
 
         "📌 COMANDOS\n" +
         ">call mechanic → abre la tienda\n" +
-        ">mechanic help → esta guía\n\n" +
+        ">mechanic help → guía del sistema\n\n" +
 
         "🪙 TOKENS\n" +
-        "Moneda del sistema usada para comprar ítems.\n\n" +
+        "Moneda usada para comprar ítems.\n\n" +
 
         "🧷 ENCANDENAMIENTO\n" +
         "Prisión temporal de 30 minutos.\n\n" +
@@ -151,7 +151,7 @@ client.on("messageCreate", async (message) => {
         "Elimina prisión inmediatamente.\n\n" +
 
         "✏️ RENOMBRAR\n" +
-        "Permite poner un nombre personalizado a un usuario.\n\n" +
+        "Cambia el nickname del usuario.\n\n" +
 
         "🛡️ INMUNIDAD CD\n" +
         "Ignora cooldown del sistema por 1 hora.\n\n" +
@@ -159,11 +159,8 @@ client.on("messageCreate", async (message) => {
         "🛡️ ESCUDO [1 IMPACTO]\n" +
         "Bloquea un ataque y se destruye.\n\n" +
 
-        "📡 AVISO\n" +
-        "La tienda está sujeta a cambios próximamente.\n\n" +
-
         "📡 SISTEMA\n" +
-        "• El sistema se encuentra estable y en funcionamiento\n" +
+        "Sistema estable y en funcionamiento\n" +
 
         "```"
       )
@@ -228,7 +225,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
     });
   }
 
+  // ─────────────────────────────
   // ⚡ EXECUTE
+  // ─────────────────────────────
   if (interaction.customId.startsWith("execute_")) {
 
     const [, action, targetId] = interaction.customId.split("_");
@@ -297,48 +296,63 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.update({ content: "🛡️ escudo activado", components: [] });
     }
 
-    // ✏️ RENOMBRAR (AHORA POR INPUT EN CHAT)
+    // ─────────────────────────────
+    // ✏️ RENOMBRAR (FIX MODAL)
+    // ─────────────────────────────
     if (action === "rename") {
 
-      await interaction.update({
-        content: `✏️ escribe en el chat el nuevo nombre para <@${targetId}> (30s)`,
-        components: []
-      });
+      const modal = new ModalBuilder()
+        .setCustomId(`rename_${targetId}`)
+        .setTitle("✏️ Nuevo nombre");
 
-      const filter = m =>
-        m.author.id === buyer.id &&
-        m.channel.id === interaction.channel.id;
+      const input = new TextInputBuilder()
+        .setCustomId("new_name")
+        .setLabel("Escribe el nuevo nombre")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMaxLength(32);
 
-      try {
-        const collected = await interaction.channel.awaitMessages({
-          filter,
-          max: 1,
-          time: 30000,
-          errors: ["time"]
-        });
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(input)
+      );
 
-        const newName = collected.first().content;
-        const old = target.nickname || target.user.username;
-
-        await target.setNickname(newName);
-        await buyer.roles.remove(TOKENS_ROLE);
-
-        setTimeout(async () => {
-          try { await target.setNickname(old); } catch {}
-        }, 40 * 60 * 1000);
-
-        return interaction.followUp({
-          content: `✏️ nombre cambiado a **${newName}**`,
-          ephemeral: true
-        });
-
-      } catch {
-        return interaction.followUp({
-          content: "❌ tiempo agotado, cancelado",
-          ephemeral: true
-        });
-      }
+      return interaction.showModal(modal);
     }
+  }
+
+  // ─────────────────────────────
+  // 🧠 MODAL HANDLER
+  // ─────────────────────────────
+  if (interaction.isModalSubmit() && interaction.customId.startsWith("rename_")) {
+
+    const targetId = interaction.customId.split("_")[1];
+    const newName = interaction.fields.getTextInputValue("new_name");
+
+    const guild = interaction.guild;
+    const buyer = interaction.member;
+
+    const target = await guild.members.fetch(targetId).catch(() => null);
+
+    if (!target) {
+      return interaction.reply({
+        content: "usuario no encontrado",
+        ephemeral: true
+      });
+    }
+
+    const old = target.nickname || target.user.username;
+
+    await target.setNickname(newName);
+    await buyer.roles.remove(TOKENS_ROLE);
+
+    setTimeout(async () => {
+      try { await target.setNickname(old); } catch {}
+    }, 40 * 60 * 1000);
+
+    return interaction.reply({
+      content: `✏️ nombre cambiado a **${newName}**`,
+      ephemeral: true
+    });
   }
 });
 
