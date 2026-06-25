@@ -62,12 +62,9 @@ const randomNames = [
   "Lobo", "Ángel", "Demonio", "Neón", "Eco"
 ];
 
-// ─────────────────────────────
 // 🔥 TOKEN CONSUMER
-// ─────────────────────────────
 async function consumeToken(member) {
   if (!member.roles.cache.has(TOKENS_ROLE)) return false;
-
   try {
     await member.roles.remove(TOKENS_ROLE);
     return true;
@@ -76,9 +73,7 @@ async function consumeToken(member) {
   }
 }
 
-// ─────────────────────────────
-// 🤖 MESSAGE SYSTEM
-// ─────────────────────────────
+// 🟣 MESSAGE SYSTEM
 client.on("messageCreate", async (message) => {
 
   if (message.author.bot) return;
@@ -98,6 +93,7 @@ client.on("messageCreate", async (message) => {
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
 
+  // 🛒 TIENDA
   if (args[0] === "call" && args[1] === "mechanic") {
 
     if (!message.member.roles.cache.has(TOKENS_ROLE)) {
@@ -107,7 +103,6 @@ client.on("messageCreate", async (message) => {
     const loading = await message.channel.send("🟣 ⚙️ iniciando sistema...");
     await new Promise(r => setTimeout(r, 1200));
 
-    // 🔥 TIENDA COMPLETA SIN RECORTES
     const embed = new EmbedBuilder()
       .setTitle("🛒 ⚙️ THE MECHANIC STORE")
       .setDescription(
@@ -180,9 +175,7 @@ client.on("messageCreate", async (message) => {
   }
 });
 
-// ─────────────────────────────
-// INTERACTIONS
-// ─────────────────────────────
+// 🟣 INTERACTIONS
 client.on(Events.InteractionCreate, async (interaction) => {
 
   if (!interaction.isStringSelectMenu() &&
@@ -225,33 +218,35 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.reply({ content: "🚫 booster protegido", ephemeral: true });
     }
 
-    const ok = await consumeToken(buyer);
-    if (!ok && action !== "rename") {
-      return interaction.reply({ content: "sin token", ephemeral: true });
-    }
+    let success = false;
+
+    const safeReply = (msg) =>
+      interaction.reply({ content: msg, ephemeral: true });
+
+    // ───────── ACTIONS ─────────
 
     if (action === "chain") {
-      if (immune) return interaction.reply({ content: "inmune", ephemeral: true });
+      if (immune) return safeReply("inmune");
       await target.roles.add(PRISON_ROLE);
       setTimeout(() => target.roles.remove(PRISON_ROLE).catch(() => {}), 30 * 60000);
-      return interaction.reply({ content: "encadenado", ephemeral: true });
+      success = true;
     }
 
     if (action === "release") {
       await target.roles.remove(PRISON_ROLE);
-      return interaction.reply({ content: "liberado", ephemeral: true });
+      success = true;
     }
 
     if (action === "immunity") {
       await target.roles.add(IMMUNITY_ROLE);
       setTimeout(() => target.roles.remove(IMMUNITY_ROLE).catch(() => {}), 60 * 60000);
-      return interaction.reply({ content: "inmunidad", ephemeral: true });
+      success = true;
     }
 
     if (action === "shield") {
       await target.roles.add(SHIELD_ROLE);
       setTimeout(() => target.roles.remove(SHIELD_ROLE).catch(() => {}), 60 * 60000);
-      return interaction.reply({ content: "escudo", ephemeral: true });
+      success = true;
     }
 
     if (action === "rename") {
@@ -283,13 +278,28 @@ client.on(Events.InteractionCreate, async (interaction) => {
         target.setNickname(old).catch(() => {});
       }, 60000);
 
-      return interaction.reply({ content: "🎲 random activo", ephemeral: true });
+      success = true;
     }
 
     if (action === "extras") {
       await target.roles.add(EXTRA_ROLE);
       setTimeout(() => target.roles.remove(EXTRA_ROLE).catch(() => {}), 60 * 60 * 1000);
-      return interaction.reply({ content: "🔓 permisos extras activados por 1 hora", ephemeral: true });
+      success = true;
+    }
+
+    // ───────── FINAL CHECK ─────────
+    if (success) {
+      const ok = await consumeToken(buyer);
+
+      if (!ok) {
+        return interaction.reply({ content: "❌ no tenías token al final", ephemeral: true });
+      }
+
+      return interaction.update({
+        content: "🟣 compra completada correctamente",
+        embeds: [],
+        components: []
+      });
     }
   }
 
@@ -303,16 +313,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (!target) return interaction.reply({ content: "no encontrado", ephemeral: true });
 
-    const old = target.nickname || target.user.username;
-
     await target.setNickname(newName);
 
     setTimeout(() => {
-      target.setNickname(old).catch(() => {});
+      target.setNickname(target.user.username).catch(() => {});
     }, 40 * 60000);
 
     const ok = await consumeToken(buyer);
-    if (!ok) return interaction.reply({ content: "sin token", ephemeral: true });
+
+    if (!ok) {
+      return interaction.reply({ content: "❌ no tenías token", ephemeral: true });
+    }
 
     return interaction.reply({ content: "cambiado", ephemeral: true });
   }
