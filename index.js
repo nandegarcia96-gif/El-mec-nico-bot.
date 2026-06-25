@@ -116,31 +116,31 @@ client.on("messageCreate", async (message) => {
         "🪙 1 TOKEN\n" +
         
         "ENCARCELA USUARIO A TU ELECCION\n" +
-        
+            -----------------------
         "⛓️ LIBERACIÓN → Instantanea\n" +
 
         "🪙 1 TOKEN\n" +
 
         "LIBERAR A UN USUARIO DE LA CARCEL DE TU ELECCION\n" +
-        
+            -----------------------
         "✏️ RENOMBRAR → nickname temporal\n" +
 
         "🪙 1 TOKEN\n" +
 
         "RENOMBRARAS A GUSTO A UN USUARIO DE TU ELECCION POR 15 MINUTOS\n" +
-        
+            -----------------------
         "🎲 RANDOM NAME → cambio constante\n" +
 
         "🪙 1 TOKEN\n" +
 
         "CAMBIA EL APODO DE MANERA ALEATORIA DE UN USUARIO POR 1 MINUTO\n" +
-      
+            -----------------------
         "🛡️ INMUNIDAD CD → bypass\n" +
 
         "🪙 1 TOKEN\n" +
 
         "SERAS INMUNE TEMPORALMENTE AL MODO LENTO DE 30 MINUTOS A 1 HORA\n" +
-        
+            -----------------------
         "🛡️ ESCUDO → bloquea ataque\n" +
 
         "🪙 1 TOKEN\n" +
