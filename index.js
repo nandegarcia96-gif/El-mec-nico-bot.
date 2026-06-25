@@ -23,6 +23,9 @@ const client = new Client({
   ]
 });
 
+// 🔐 RESTRICCIÓN CANAL
+const ALLOWED_CHANNEL = "1519418226973347992";
+
 // 🔐 ROLES
 const TOKENS_ROLE = "1517347810167619697";
 const PRISON_ROLE = "1459458843816759412";
@@ -37,9 +40,7 @@ const IMMUNE_ROLES = [
   "1427099549364781127"
 ];
 
-// ─────────────────────────────
 // 📦 MONGO
-// ─────────────────────────────
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("📦 MongoDB conectado"))
   .catch(err => console.log("❌ Mongo error:", err));
@@ -62,6 +63,9 @@ const prefix = ">";
 client.on("messageCreate", async (message) => {
 
   if (message.author.bot) return;
+
+  // 📌 SOLO CANAL PERMITIDO
+  if (message.channel.id !== ALLOWED_CHANNEL) return;
 
   if (message.mentions.has(client.user)) {
     return message.reply(
@@ -187,7 +191,8 @@ client.on("messageCreate", async (message) => {
 // ─────────────────────────────
 client.on(Events.InteractionCreate, async (interaction) => {
 
-  if (interaction.isStringSelectMenu()) {
+  // 🧠 SELECT MENU PRINCIPAL
+  if (interaction.isStringSelectMenu() && interaction.customId === "shop_menu") {
 
     const option = interaction.values[0];
 
@@ -197,122 +202,123 @@ client.on(Events.InteractionCreate, async (interaction) => {
         embeds: [],
         components: []
       });
-
       return interaction.deleteReply();
     }
 
+    // 👉 CONFIRMACIÓN
     const menu = new ActionRowBuilder().addComponents(
       new UserSelectMenuBuilder()
-        .setCustomId(`user_${option}`)
+        .setCustomId(`confirm_${option}`)
         .setPlaceholder("selecciona usuario")
         .setMaxValues(1)
     );
 
     return interaction.reply({
-      content: "elige usuario:",
+      content: "⚠️ confirma usuario para continuar",
       components: [menu],
       ephemeral: true
     });
   }
 
-  if (interaction.isUserSelectMenu()) {
+  // 👤 CONFIRM STEP
+  if (interaction.isUserSelectMenu() && interaction.customId.startsWith("confirm_")) {
 
-    const [_, action] = interaction.customId.split("_");
-
+    const action = interaction.customId.split("_")[1];
     const targetId = interaction.values[0];
+
+    return interaction.update({
+      content: `⚠️ confirmar acción **${action}** en <@${targetId}>`,
+      components: [
+        new ActionRowBuilder().addComponents(
+          new StringSelectMenuBuilder()
+            .setCustomId(`execute_${action}_${targetId}`)
+            .setPlaceholder("confirmar ejecución")
+            .addOptions([
+              { label: "Confirmar", value: "yes", emoji: "✔️" },
+              { label: "Cancelar", value: "no", emoji: "❌" }
+            ])
+        )
+      ]
+    });
+  }
+
+  // ⚡ EJECUCIÓN FINAL
+  if (interaction.isStringSelectMenu() && interaction.customId.startsWith("execute_")) {
+
+    const [, action, targetId] = interaction.customId.split("_");
+
+    if (interaction.values[0] === "no") {
+      return interaction.update({
+        content: "❌ acción cancelada",
+        components: []
+      });
+    }
+
     const guild = interaction.guild;
-
-    const target = await guild.members.fetch(targetId).catch(() => null);
     const buyer = interaction.member;
+    const target = await guild.members.fetch(targetId).catch(() => null);
 
-    if (!target) return interaction.reply({ content: "usuario no encontrado", ephemeral: true });
+    if (!target) {
+      return interaction.update({ content: "usuario no encontrado", components: [] });
+    }
 
+    // 🧷 ENC
     if (action === "chain") {
-      if (target.roles.cache.has(PRISON_ROLE)) {
-        return interaction.reply({ content: "ya está en prisión", ephemeral: true });
-      }
-
       await target.roles.add(PRISON_ROLE);
       await buyer.roles.remove(TOKENS_ROLE);
 
       setTimeout(async () => {
-        try {
-          await target.roles.remove(PRISON_ROLE);
-        } catch {}
+        try { await target.roles.remove(PRISON_ROLE); } catch {}
       }, 30 * 60 * 1000);
 
-      return interaction.reply({ content: "encadenado", ephemeral: true });
+      return interaction.update({ content: "🧷 encadenado", components: [] });
     }
 
+    // ⛓️ LIBERACIÓN
     if (action === "release") {
       await target.roles.remove(PRISON_ROLE);
       await buyer.roles.remove(TOKENS_ROLE);
 
-      return interaction.reply({ content: "liberado", ephemeral: true });
+      return interaction.update({ content: "⛓️ liberado", components: [] });
     }
 
+    // 🛡️ INMUNIDAD
     if (action === "immunity") {
       await target.roles.add(IMMUNITY_ROLE);
       await buyer.roles.remove(TOKENS_ROLE);
 
       setTimeout(async () => {
-        try {
-          await target.roles.remove(IMMUNITY_ROLE);
-        } catch {}
+        try { await target.roles.remove(IMMUNITY_ROLE); } catch {}
       }, 60 * 60 * 1000);
 
-      return interaction.reply({ content: "inmunidad activa", ephemeral: true });
+      return interaction.update({ content: "🛡️ inmunidad activada", components: [] });
     }
 
+    // 🛡️ ESCUDO
     if (action === "shield") {
       await target.roles.add(SHIELD_ROLE);
       await buyer.roles.remove(TOKENS_ROLE);
 
       setTimeout(async () => {
-        try {
-          await target.roles.remove(SHIELD_ROLE);
-        } catch {}
+        try { await target.roles.remove(SHIELD_ROLE); } catch {}
       }, 60 * 60 * 1000);
 
-      return interaction.reply({ content: "escudo activado", ephemeral: true });
+      return interaction.update({ content: "🛡️ escudo activado", components: [] });
     }
 
+    // ✏️ RENOMBRAR
     if (action === "rename") {
 
-      const modal = new ModalBuilder()
-        .setCustomId(`rename_${targetId}`)
-        .setTitle("nuevo nombre");
+      const old = target.nickname || target.user.username;
 
-      const input = new TextInputBuilder()
-        .setCustomId("new_name")
-        .setLabel("nombre")
-        .setStyle(TextInputStyle.Short);
-
-      modal.addComponents(new ActionRowBuilder().addComponents(input));
-
-      return interaction.showModal(modal);
-    }
-  }
-
-  if (interaction.isModalSubmit()) {
-
-    if (interaction.customId.startsWith("rename_")) {
-
-      const targetId = interaction.customId.split("_")[1];
-      const newName = interaction.fields.getTextInputValue("new_name");
-
-      const member = await interaction.guild.members.fetch(targetId);
-      const old = member.nickname || member.user.username;
-
-      await member.setNickname(newName);
+      await target.setNickname("MECHANIC USER");
+      await buyer.roles.remove(TOKENS_ROLE);
 
       setTimeout(async () => {
-        try {
-          await member.setNickname(old);
-        } catch {}
+        try { await target.setNickname(old); } catch {}
       }, 40 * 60 * 1000);
 
-      return interaction.reply({ content: "renombrado aplicado", ephemeral: true });
+      return interaction.update({ content: "✏️ renombrado aplicado", components: [] });
     }
   }
 });
