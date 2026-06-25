@@ -116,7 +116,7 @@ client.on("messageCreate", async (message) => {
     "🪙 1 TOKEN\n" +
     "⏳ 30 min\n" +
     "⚙️ bloquea acceso a interacciones básicas del sistema\n" +
-    "🔗 efecto temporal de restricción de canales\n" +
+    "🔗 efecto temporal de restricción de canales\n\n" +
 
     "⛓️ LIBERACIÓN\n" +
     "🪙 1 TOKEN\n" +
@@ -133,7 +133,7 @@ client.on("messageCreate", async (message) => {
     "🪙 1 TOKEN\n" +
     "⏳ 1 min\n" +
     "⚙️ cambia el nombre del usuario constantemente\n" +
-    "💿 cada 10–15 segundos cambia a un nombre\n" +
+    "💿 cada 10–15 segundos cambia a un nombre\n\n" +
 
     "🛡️ INMUNIDAD CD\n" +
     "🪙 1 TOKEN\n" +
