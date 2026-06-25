@@ -5,6 +5,7 @@ const {
   EmbedBuilder,
   ActionRowBuilder,
   StringSelectMenuBuilder,
+  UserSelectMenuBuilder,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle
@@ -47,7 +48,7 @@ mongoose.connect(process.env.MONGO_URI)
 const prefix = ">";
 
 // ─────────────────────────────
-// 🤖 BOT
+// 🤖 MESSAGE SYSTEM
 // ─────────────────────────────
 client.on("messageCreate", async (message) => {
 
@@ -55,10 +56,7 @@ client.on("messageCreate", async (message) => {
   if (message.channel.id !== ALLOWED_CHANNEL) return;
 
   if (message.mentions.has(client.user)) {
-    return message.reply(
-      "🤖 Parece que no tengo ningún motivo para ayudarte.\n" +
-      "vuelve cuando tengas un token o algo de mi interés."
-    );
+    return message.reply("🤖 vuelve cuando tengas un token.");
   }
 
   if (!message.content.startsWith(prefix)) return;
@@ -75,36 +73,22 @@ client.on("messageCreate", async (message) => {
     }
 
     const loading = await message.channel.send("🟣 ⚙️ iniciando sistema...");
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise(r => setTimeout(r, 1500));
 
     const embed = new EmbedBuilder()
       .setTitle("🛒 ⚙️ THE MECHANIC STORE")
       .setDescription(
         "```yaml\n" +
 
-        "🧷 ENCANDENAMIENTO\n" +
-        "🪙 COSTE: 1 TOKEN\n" +
-        "⏳ DURACIÓN: 30 min\n" +
-        "⚙️ EFECTO: Encierra a un usuario en prisión\n\n" +
+        "🧷 ENCANDENAMIENTO\n🪙 COSTE: 1 TOKEN\n⏳ 30 min\n⚙️ encierra a un usuario\n\n" +
 
-        "⛓️ LIBERACIÓN\n" +
-        "🪙 COSTE: 1 TOKEN\n" +
-        "⚙️ EFECTO: Elimina la prisión de un usuario\n\n" +
+        "⛓️ LIBERACIÓN\n🪙 COSTE: 1 TOKEN\n⚙️ elimina prisión\n\n" +
 
-        "✏️ RENOMBRAR USUARIO\n" +
-        "🪙 COSTE: 1 TOKEN\n" +
-        "⏳ DURACIÓN: 40 min\n" +
-        "⚙️ EFECTO: Cambia el nickname con nombre personalizado\n\n" +
+        "✏️ RENOMBRAR USUARIO\n🪙 COSTE: 1 TOKEN\n⏳ 40 min\n⚙️ nickname temporal\n\n" +
 
-        "🛡️ INMUNIDAD CD\n" +
-        "🪙 COSTE: 1 TOKEN\n" +
-        "⏳ DURACIÓN: 1 HORA\n" +
-        "⚙️ EFECTO: Ignora cooldown del sistema\n\n" +
+        "🛡️ INMUNIDAD CD\n🪙 COSTE: 1 TOKEN\n⏳ 1 HORA\n⚙️ ignora cooldown\n\n" +
 
-        "🛡️ ESCUDO [1 IMPACTO]\n" +
-        "🪙 COSTE: 1 TOKEN\n" +
-        "⏳ DURACIÓN: 1 HORA\n" +
-        "⚙️ EFECTO: Bloquea el primer ataque\n\n" +
+        "🛡️ ESCUDO [1 IMPACTO]\n🪙 COSTE: 1 TOKEN\n⏳ 1 HORA\n⚙️ bloquea ataque\n\n" +
 
         "```"
       )
@@ -140,50 +124,38 @@ client.on("messageCreate", async (message) => {
       .setDescription(
         "```yaml\n" +
 
-        "📌 COMANDOS\n" +
-        ">call mechanic → abre la tienda\n" +
-        ">mechanic help → guía del sistema\n\n" +
+        "📌 COMANDOS\n>call mechanic\n>mechanic help\n\n" +
 
-        "🪙 TOKENS\n" +
-        "Moneda usada para comprar ítems.\n\n" +
+        "🪙 TOKENS\nmoneda del sistema\n\n" +
 
-        "🧷 ENCANDENAMIENTO\n" +
-        "Prisión de 30 minutos a un usuario.\n\n" +
+        "🧷 ENCANDENAMIENTO\n30 min prisión\n\n" +
 
-        "⛓️ LIBERACIÓN\n" +
-        "Elimina prisión inmediatamente.\n\n" +
+        "⛓️ LIBERACIÓN\nquita prisión\n\n" +
 
-        "✏️ RENOMBRAR\n" +
-        "Cambia nickname temporalmente.\n\n" +
+        "✏️ RENOMBRAR\nnickname temporal\n\n" +
 
-        "🛡️ INMUNIDAD CD\n" +
-        "Ignora cooldown por 1 hora.\n\n" +
+        "🛡️ INMUNIDAD CD\ncooldown bypass\n\n" +
 
-        "🛡️ ESCUDO [1 IMPACTO]\n" +
-        "Bloquea un ataque y se consume.\n\n" +
+        "🛡️ ESCUDO\nbloquea ataque\n\n" +
 
-        "📡 SISTEMA\n" +
-        "Sistema estable y en funcionamiento.\n\n" +
+        "📡 SISTEMA\nestable\n\n" +
 
-        "⚠️ AVISO\n" +
-        "La tienda está sujeta a cambios próximamente.\n" +
+        "⚠️ la tienda puede cambiar\n" +
 
         "```"
       )
-      .setFooter({ text: "🤖 MECHANIC GUIDE SYSTEM" });
+      .setFooter({ text: "🤖 GUIDE SYSTEM" });
 
     return message.channel.send({ embeds: [embed] });
   }
 });
 
 // ─────────────────────────────
-// ⚡ INTERACCIONES
+// ⚡ INTERACTIONS
 // ─────────────────────────────
 client.on(Events.InteractionCreate, async (interaction) => {
 
-  if (!interaction.isStringSelectMenu() && !interaction.isModalSubmit()) return;
-
-  // ───── SHOP MENU ─────
+  // ───────── SHOP MENU ─────────
   if (interaction.isStringSelectMenu() && interaction.customId === "shop_menu") {
 
     const option = interaction.values[0];
@@ -196,56 +168,130 @@ client.on(Events.InteractionCreate, async (interaction) => {
       });
     }
 
-    // 🔥 RENOMBRAR (FIX)
-    if (option === "rename") {
-
-      const modal = new ModalBuilder()
-        .setCustomId("rename_modal")
-        .setTitle("✏️ Renombrar usuario");
-
-      const target = new TextInputBuilder()
-        .setCustomId("target")
-        .setLabel("Usuario (ID o @mención)")
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true);
-
-      const name = new TextInputBuilder()
-        .setCustomId("new_name")
-        .setLabel("Nuevo nombre")
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true)
-        .setMaxLength(32);
-
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(target),
-        new ActionRowBuilder().addComponents(name)
-      );
-
-      return interaction.showModal(modal);
-    }
-
     return interaction.reply({
-      content: "⚠️ función en modo estable",
+      content: "elige usuario:",
+      components: [
+        new ActionRowBuilder().addComponents(
+          new UserSelectMenuBuilder()
+            .setCustomId(`user_${option}`)
+            .setPlaceholder("selecciona usuario")
+            .setMaxValues(1)
+        )
+      ],
       ephemeral: true
     });
   }
 
-  // ─────────────────────────────
-  // ✏️ MODAL RENAMER
-  // ─────────────────────────────
-  if (interaction.isModalSubmit() && interaction.customId === "rename_modal") {
+  // ───────── USER SELECT ─────────
+  if (interaction.isUserSelectMenu() && interaction.customId.startsWith("user_")) {
 
-    const raw = interaction.fields.getTextInputValue("target");
-    const newName = interaction.fields.getTextInputValue("new_name");
+    const action = interaction.customId.split("_")[1];
+    const targetId = interaction.values[0];
 
-    const id = raw.replace(/[<@!>]/g, "");
-    const target = await interaction.guild.members.fetch(id).catch(() => null);
+    return interaction.update({
+      content: `confirmar **${action}** en <@${targetId}>`,
+      components: [
+        new ActionRowBuilder().addComponents(
+          new StringSelectMenuBuilder()
+            .setCustomId(`execute_${action}_${targetId}`)
+            .addOptions([
+              { label: "Confirmar", value: "yes", emoji: "✔️" },
+              { label: "Cancelar", value: "no", emoji: "❌" }
+            ])
+        )
+      ]
+    });
+  }
+
+  // ───────── EXECUTE ─────────
+  if (interaction.isStringSelectMenu() && interaction.customId.startsWith("execute_")) {
+
+    const [, action, targetId] = interaction.customId.split("_");
+
+    if (interaction.values[0] === "no") {
+      return interaction.update({ content: "❌ cancelado", components: [] });
+    }
+
+    const guild = interaction.guild;
+    const buyer = interaction.member;
+    const target = await guild.members.fetch(targetId).catch(() => null);
 
     if (!target) {
-      return interaction.reply({
-        content: "❌ usuario no encontrado",
-        ephemeral: true
-      });
+      return interaction.update({ content: "usuario no encontrado", components: [] });
+    }
+
+    const isImmune = IMMUNE_ROLES.some(r => target.roles.cache.has(r));
+
+    if (action === "chain") {
+
+      if (isImmune) return interaction.update({ content: "inmune", components: [] });
+
+      await target.roles.add(PRISON_ROLE);
+      await buyer.roles.remove(TOKENS_ROLE);
+
+      setTimeout(async () => {
+        try { await target.roles.remove(PRISON_ROLE); } catch {}
+      }, 30 * 60 * 1000);
+
+      return interaction.update({ content: "🧷 encadenado", components: [] });
+    }
+
+    if (action === "release") {
+      await target.roles.remove(PRISON_ROLE);
+      await buyer.roles.remove(TOKENS_ROLE);
+      return interaction.update({ content: "⛓️ liberado", components: [] });
+    }
+
+    if (action === "immunity") {
+      await target.roles.add(IMMUNITY_ROLE);
+      await buyer.roles.remove(TOKENS_ROLE);
+
+      setTimeout(async () => {
+        try { await target.roles.remove(IMMUNITY_ROLE); } catch {}
+      }, 60 * 60 * 1000);
+
+      return interaction.update({ content: "🛡️ inmunidad", components: [] });
+    }
+
+    if (action === "shield") {
+      await target.roles.add(SHIELD_ROLE);
+      await buyer.roles.remove(TOKENS_ROLE);
+
+      setTimeout(async () => {
+        try { await target.roles.remove(SHIELD_ROLE); } catch {}
+      }, 60 * 60 * 1000);
+
+      return interaction.update({ content: "🛡️ escudo", components: [] });
+    }
+
+    // ───────── RENAMER (MODAL) ─────────
+    if (action === "rename") {
+
+      const modal = new ModalBuilder()
+        .setCustomId(`rename_${targetId}`)
+        .setTitle("renombrar usuario");
+
+      const input = new TextInputBuilder()
+        .setCustomId("new_name")
+        .setLabel("nuevo nombre")
+        .setStyle(TextInputStyle.Short);
+
+      modal.addComponents(new ActionRowBuilder().addComponents(input));
+
+      return interaction.showModal(modal);
+    }
+  }
+
+  // ───────── MODAL ─────────
+  if (interaction.isModalSubmit() && interaction.customId.startsWith("rename_")) {
+
+    const targetId = interaction.customId.split("_")[1];
+    const newName = interaction.fields.getTextInputValue("new_name");
+
+    const target = await interaction.guild.members.fetch(targetId).catch(() => null);
+
+    if (!target) {
+      return interaction.reply({ content: "usuario no encontrado", ephemeral: true });
     }
 
     const old = target.nickname || target.user.username;
@@ -254,13 +300,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
     await interaction.member.roles.remove(TOKENS_ROLE);
 
     setTimeout(async () => {
-      try {
-        await target.setNickname(old);
-      } catch {}
+      try { await target.setNickname(old); } catch {}
     }, 40 * 60 * 1000);
 
     return interaction.reply({
-      content: `✏️ nombre cambiado a **${newName}**`,
+      content: `✏️ cambiado a **${newName}**`,
       ephemeral: true
     });
   }
