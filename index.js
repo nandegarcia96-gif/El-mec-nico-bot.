@@ -11,9 +11,9 @@ const {
   TextInputStyle
 } = require("discord.js");
 
-// 📦 MONGODB
 const mongoose = require("mongoose");
 
+// 🤖 CLIENTE
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -29,7 +29,7 @@ const PRISON_ROLE = "1459458843816759412";
 const IMMUNITY_ROLE = "1515011976621854790";
 const SHIELD_ROLE = "ID_DEL_ROL_ESCUDO";
 
-// 🛡️ INMUNIDAD A PRISIÓN
+// 🛡️ INMUNIDADES
 const IMMUNE_ROLES = [
   "1465082323220562013",
   "1426385179575975936",
@@ -37,13 +37,17 @@ const IMMUNE_ROLES = [
   "1427099549364781127"
 ];
 
-// 📜 LOGS
-const LOG_CHANNEL = "1519438831479427192";
-
 const prefix = ">";
 
 // ─────────────────────────────
-// 🤖 MENSAJES BOT
+// 🧠 CONEXIÓN MONGO
+// ─────────────────────────────
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("📦 MongoDB conectado"))
+  .catch(err => console.log("❌ Mongo error:", err));
+
+// ─────────────────────────────
+// 🤖 MENSAJES
 // ─────────────────────────────
 client.on("messageCreate", async (message) => {
 
@@ -79,8 +83,38 @@ client.on("messageCreate", async (message) => {
 
     const embed = new EmbedBuilder()
       .setTitle("🛒 ⚙️ THE MECHANIC STORE")
-      .setDescription("Sistema cargado...")
-      .setColor(0x8b5cf6);
+      .setDescription(
+        "```yaml\n" +
+
+        "🧷 ENCANDENAMIENTO\n" +
+        "🪙 COSTE: 1 TOKEN\n" +
+        "⏳ DURACIÓN: 30 min\n" +
+        "⚙️ EFECTO: Encierra a un usuario en prisión\n\n" +
+
+        "⛓️ LIBERACIÓN\n" +
+        "🪙 COSTE: 1 TOKEN\n" +
+        "⚙️ EFECTO: Elimina la prisión de un usuario\n\n" +
+
+        "✏️ RENOMBRAR USUARIO\n" +
+        "🪙 COSTE: 1 TOKEN\n" +
+        "⏳ DURACIÓN: 40 min\n" +
+        "⚙️ EFECTO: Cambia temporalmente el nickname\n\n" +
+
+        "🛡️ INMUNIDAD CD\n" +
+        "🪙 COSTE: 1 TOKEN\n" +
+        "⏳ DURACIÓN: 1 hora\n" +
+        "⚙️ EFECTO: Ignora slowmode / cooldown del sistema\n\n" +
+
+        "🛡️ ESCUDO [1 IMPACTO]\n" +
+        "🪙 COSTE: 1 TOKEN\n" +
+        "⏳ DURACIÓN: 1 hora\n" +
+        "⚙️ EFECTO: Bloquea el primer intento de ataque\n\n" +
+
+        "```"
+      )
+      .setColor(0x8b5cf6)
+      .setImage("https://cdn.discordapp.com/attachments/1402268718360297544/1519443095379513496/E42BDE84-B055-4A1C-B788-620B7DC904AD.gif")
+      .setFooter({ text: "🤖 MECHANIC SYSTEM ONLINE" });
 
     const menu = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
@@ -127,7 +161,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         components: []
       });
 
-      await new Promise(r => setTimeout(r, 1000));
+      await new Promise(r => setTimeout(r, 1200));
 
       return interaction.deleteReply();
     }
@@ -159,6 +193,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (!target) return interaction.reply({ content: "usuario no encontrado", ephemeral: true });
 
     if (action === "chain") {
+
       if (isImmune(target)) {
         return interaction.reply({
           content: "🤖 objetivo inmune",
@@ -263,12 +298,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-// 🔌 MONGO CONNECT
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("📦 MongoDB conectado"))
-  .catch(err => console.log("❌ Mongo error:", err));
-
-// 🤖 READY
 client.once(Events.ClientReady, () => {
   console.log("🤖 mechanic online");
 });
