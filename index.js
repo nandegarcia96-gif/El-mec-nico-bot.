@@ -32,6 +32,7 @@ const PRISON_ROLE = "1459458843816759412";
 const IMMUNITY_ROLE = "1515011976621854790";
 const SHIELD_ROLE = "1449488332273877153";
 const BOOSTER_ROLE = "1427099549364781127";
+const EXTRA_ROLE = "1426678812443148430";
 
 // 🛡️ INMUNIDADES
 const IMMUNE_ROLES = [
@@ -61,9 +62,7 @@ const randomNames = [
   "Lobo", "Ángel", "Demonio", "Neón", "Eco"
 ];
 
-// ─────────────────────────────
-// 🔥 TOKEN CONSUMER (FIX PRINCIPAL)
-// ─────────────────────────────
+// 🔥 TOKEN CONSUMER
 async function consumeToken(member) {
   if (!member.roles.cache.has(TOKENS_ROLE)) return false;
 
@@ -76,7 +75,7 @@ async function consumeToken(member) {
 }
 
 // ─────────────────────────────
-// 🤖 MESSAGE SYSTEM
+// MESSAGE SYSTEM
 // ─────────────────────────────
 client.on("messageCreate", async (message) => {
 
@@ -108,51 +107,57 @@ client.on("messageCreate", async (message) => {
     await new Promise(r => setTimeout(r, 1200));
 
     const embed = new EmbedBuilder()
-  .setTitle("🛒 ⚙️ THE MECHANIC STORE")
-  .setDescription(
-    "```yaml\n" +
+      .setTitle("🛒 ⚙️ THE MECHANIC STORE")
+      .setDescription(
+        "```yaml\n" +
 
-    "🔗 ENCANDENAMIENTO\n" +
-    "🪙 1 TOKEN\n" +
-    "⏳ 30 min\n" +
-    "⚙️ bloquea acceso a interacciones básicas del sistema\n" +
-    "🔗 efecto temporal de restricción de canales\n\n" +
+        "🔗 ENCANDENAMIENTO\n" +
+        "🪙 1 TOKEN\n" +
+        "⏳ 30 min\n" +
+        "⚙️ bloquea acceso a interacciones básicas del sistema\n" +
+        "🔗 efecto temporal de restricción de canales\n\n" +
 
-    "⛓️ LIBERACIÓN\n" +
-    "🪙 1 TOKEN\n" +
-    "⚙️ elimina el efecto de encadenamiento\n" +
-    "⛓️‍💥 restaura el acceso normal del usuario\n\n" +
+        "⛓️ LIBERACIÓN\n" +
+        "🪙 1 TOKEN\n" +
+        "⚙️ elimina el efecto de encadenamiento\n" +
+        "⛓️‍💥 restaura el acceso normal del usuario\n\n" +
 
-    "✏️ RENOMBRAR USUARIO\n" +
-    "🪙 1 TOKEN\n" +
-    "⏳ 40 min\n" +
-    "⚙️ cambia el nickname del usuario temporalmente\n" +
-    "✨ vuelve al nombre original al finalizar\n\n" +
+        "✏️ RENOMBRAR USUARIO\n" +
+        "🪙 1 TOKEN\n" +
+        "⏳ 40 min\n" +
+        "⚙️ cambia el nickname del usuario temporalmente\n" +
+        "✨ vuelve al nombre original al finalizar\n\n" +
 
-    "🎲 NOMBRES ALEATORIOS\n" +
-    "🪙 1 TOKEN\n" +
-    "⏳ 1 min\n" +
-    "⚙️ cambia el nombre del usuario constantemente\n" +
-    "💿 cada 10–15 segundos cambia a un nombre\n\n" +
+        "🛠️ PERMISOS EXTRAS\n" +
+        "🪙 1 TOKEN\n" +
+        "⏳ 1 HORA\n" +
+        "⚙️ permisos temporales avanzados\n" +
+        "💬 links, archivos, nombre y VC\n\n" +
 
-    "🛡️ INMUNIDAD CD\n" +
-    "🪙 1 TOKEN\n" +
-    "⏳ 1 HORA\n" +
-    "⚙️ ignora el cooldown del servidor\n" +
-    "💬 permite uso continuo de acciones\n\n" +
+        "🎲 NOMBRES ALEATORIOS\n" +
+        "🪙 1 TOKEN\n" +
+        "⏳ 1 min\n" +
+        "⚙️ cambia el nombre del usuario constantemente\n" +
+        "💿 cada 10–15 segundos cambia a un nombre\n\n" +
 
-    "🛡️ ESCUDO\n" +
-    "🪙 1 TOKEN\n" +
-    "⏳ 1 HORA\n" +
-    "⚙️ bloquea 1 acción recibida del sistema\n" +
-    "🛡️ protege contra un efecto\n" +
+        "🛡️ INMUNIDAD CD\n" +
+        "🪙 1 TOKEN\n" +
+        "⏳ 1 HORA\n" +
+        "⚙️ ignora el cooldown del servidor\n" +
+        "💬 permite uso continuo de acciones\n\n" +
 
-    "```"
-  )
-  .setColor(0x8b5cf6)
-  .setImage("https://cdn.discordapp.com/attachments/1402268718360297544/1519443095379513496/E42BDE84-B055-4A1C-B788-620B7DC904AD.gif")
-  .setFooter({ text: "🤖 MECHANIC SYSTEM ONLINE" });
-    
+        "🛡️ ESCUDO\n" +
+        "🪙 1 TOKEN\n" +
+        "⏳ 1 HORA\n" +
+        "⚙️ bloquea 1 acción recibida del sistema\n" +
+        "🛡️ protege contra un efecto\n" +
+
+        "```"
+      )
+      .setColor(0x8b5cf6)
+      .setImage("https://cdn.discordapp.com/attachments/1402268718360297544/1519443095379513496/E42BDE84-B055-4A1C-B788-620B7DC904AD.gif")
+      .setFooter({ text: "🤖 MECHANIC SYSTEM ONLINE" });
+
     const menu = new ActionRowBuilder().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId("shop_menu")
@@ -164,6 +169,7 @@ client.on("messageCreate", async (message) => {
           { label: "Random Name", value: "randomname", emoji: "🎲" },
           { label: "Inmunidad CD", value: "immunity", emoji: "🛡️" },
           { label: "Escudo", value: "shield", emoji: "🛡️" },
+          { label: "Permisos Extras", value: "extras", emoji: "🔓" },
           { label: "Cerrar", value: "close", emoji: "❌" }
         ])
     );
@@ -173,7 +179,7 @@ client.on("messageCreate", async (message) => {
 });
 
 // ─────────────────────────────
-// ⚡ INTERACTIONS
+// INTERACTIONS
 // ─────────────────────────────
 client.on(Events.InteractionCreate, async (interaction) => {
 
@@ -181,7 +187,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       !interaction.isUserSelectMenu() &&
       !interaction.isModalSubmit()) return;
 
-  // ───── SHOP MENU ─────
   if (interaction.isStringSelectMenu() && interaction.customId === "shop_menu") {
 
     if (interaction.values[0] === "close") {
@@ -190,18 +195,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     return interaction.reply({
       content: "elige usuario:",
+      ephemeral: true,
       components: [
         new ActionRowBuilder().addComponents(
           new UserSelectMenuBuilder()
             .setCustomId(`user_${interaction.values[0]}`)
             .setMaxValues(1)
         )
-      ],
-      ephemeral: true
+      ]
     });
   }
 
-  // ───── USER SELECT ─────
   if (interaction.isUserSelectMenu()) {
 
     const action = interaction.customId.split("_")[1];
@@ -219,53 +223,36 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.reply({ content: "🚫 booster protegido", ephemeral: true });
     }
 
-    // ───── CHAIN ─────
+    const ok = await consumeToken(buyer);
+    if (!ok && action !== "rename") {
+      return interaction.reply({ content: "sin token", ephemeral: true });
+    }
+
     if (action === "chain") {
       if (immune) return interaction.reply({ content: "inmune", ephemeral: true });
-
-      const ok = await consumeToken(buyer);
-      if (!ok) return interaction.reply({ content: "sin token", ephemeral: true });
-
       await target.roles.add(PRISON_ROLE);
       setTimeout(() => target.roles.remove(PRISON_ROLE).catch(() => {}), 30 * 60000);
-
       return interaction.reply({ content: "encadenado", ephemeral: true });
     }
 
-    // ───── RELEASE ─────
     if (action === "release") {
-      const ok = await consumeToken(buyer);
-      if (!ok) return interaction.reply({ content: "sin token", ephemeral: true });
-
       await target.roles.remove(PRISON_ROLE);
       return interaction.reply({ content: "liberado", ephemeral: true });
     }
 
-    // ───── IMMUNITY ─────
     if (action === "immunity") {
-      const ok = await consumeToken(buyer);
-      if (!ok) return interaction.reply({ content: "sin token", ephemeral: true });
-
       await target.roles.add(IMMUNITY_ROLE);
       setTimeout(() => target.roles.remove(IMMUNITY_ROLE).catch(() => {}), 60 * 60000);
-
       return interaction.reply({ content: "inmunidad", ephemeral: true });
     }
 
-    // ───── SHIELD ─────
     if (action === "shield") {
-      const ok = await consumeToken(buyer);
-      if (!ok) return interaction.reply({ content: "sin token", ephemeral: true });
-
       await target.roles.add(SHIELD_ROLE);
       setTimeout(() => target.roles.remove(SHIELD_ROLE).catch(() => {}), 60 * 60000);
-
       return interaction.reply({ content: "escudo", ephemeral: true });
     }
 
-    // ───── RENAMER ─────
     if (action === "rename") {
-
       const modal = new ModalBuilder()
         .setCustomId(`rename_${targetId}`)
         .setTitle("renombrar usuario");
@@ -276,24 +263,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setStyle(TextInputStyle.Short);
 
       modal.addComponents(new ActionRowBuilder().addComponents(input));
-
       return interaction.showModal(modal);
     }
 
-    // ───── RANDOM NAME (20s loop) ─────
     if (action === "randomname") {
-
-      const ok = await consumeToken(buyer);
-      if (!ok) return interaction.reply({ content: "sin token", ephemeral: true });
-
       const old = target.nickname || target.user.username;
 
       let i = 0;
       const interval = setInterval(async () => {
         const name = randomNames[Math.floor(Math.random() * randomNames.length)];
-        try {
-          await target.setNickname(name);
-        } catch {}
+        try { await target.setNickname(name); } catch {}
         i++;
         if (i >= 3) clearInterval(interval);
       }, 20000);
@@ -302,14 +281,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
         target.setNickname(old).catch(() => {});
       }, 60000);
 
-      return interaction.reply({
-        content: "🎲 random activo",
-        ephemeral: true
-      });
+      return interaction.reply({ content: "🎲 random activo", ephemeral: true });
+    }
+
+    if (action === "extras") {
+      await target.roles.add(EXTRA_ROLE);
+      setTimeout(() => target.roles.remove(EXTRA_ROLE).catch(() => {}), 60 * 60 * 1000);
+      return interaction.reply({ content: "🔓 permisos extras activados por 1 hora", ephemeral: true });
     }
   }
 
-  // ───── MODAL ─────
   if (interaction.isModalSubmit() && interaction.customId.startsWith("rename_")) {
 
     const targetId = interaction.customId.split("_")[1];
@@ -331,15 +312,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       target.setNickname(old).catch(() => {});
     }, 40 * 60000);
 
-    return interaction.reply({
-      content: "cambiado",
-      ephemeral: true
-    });
+    return interaction.reply({ content: "cambiado", ephemeral: true });
   }
-});
-
-client.once(Events.ClientReady, () => {
-  console.log("🤖 mechanic online");
 });
 
 client.login(process.env.TOKEN);
