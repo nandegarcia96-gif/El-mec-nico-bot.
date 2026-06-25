@@ -45,25 +45,14 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("📦 MongoDB conectado"))
   .catch(err => console.log("❌ Mongo error:", err));
 
-const userSchema = new mongoose.Schema({
-  userId: String,
-  prison: { type: Boolean, default: false },
-  shield: { type: Boolean, default: false },
-  immunity: { type: Boolean, default: false },
-  renameUntil: { type: Number, default: 0 }
-});
-
-const User = mongoose.model("User", userSchema);
+const prefix = ">";
 
 // ─────────────────────────────
 // 🤖 BOT
 // ─────────────────────────────
-const prefix = ">";
-
 client.on("messageCreate", async (message) => {
 
   if (message.author.bot) return;
-
   if (message.channel.id !== ALLOWED_CHANNEL) return;
 
   if (message.mentions.has(client.user)) {
@@ -104,17 +93,17 @@ client.on("messageCreate", async (message) => {
         "✏️ RENOMBRAR USUARIO\n" +
         "🪙 COSTE: 1 TOKEN\n" +
         "⏳ DURACIÓN: 40 min\n" +
-        "⚙️ EFECTO: Cambia temporalmente el nickname\n\n" +
+        "⚙️ EFECTO: Cambia el nickname con nombre personalizado\n\n" +
 
         "🛡️ INMUNIDAD CD\n" +
         "🪙 COSTE: 1 TOKEN\n" +
         "⏳ DURACIÓN: 1 HORA\n" +
-        "⚙️ EFECTO: Ignora slowmode / cooldown del sistema\n\n" +
+        "⚙️ EFECTO: Ignora cooldown del sistema\n\n" +
 
         "🛡️ ESCUDO [1 IMPACTO]\n" +
         "🪙 COSTE: 1 TOKEN\n" +
         "⏳ DURACIÓN: 1 HORA\n" +
-        "⚙️ EFECTO: Bloquea el primer intento de ataque\n\n" +
+        "⚙️ EFECTO: Bloquea el primer ataque\n\n" +
 
         "```"
       )
@@ -162,7 +151,7 @@ client.on("messageCreate", async (message) => {
         "Elimina prisión inmediatamente.\n\n" +
 
         "✏️ RENOMBRAR\n" +
-        "Nickname temporal por 40 minutos.\n\n" +
+        "Permite poner un nombre personalizado a un usuario.\n\n" +
 
         "🛡️ INMUNIDAD CD\n" +
         "Ignora cooldown del sistema por 1 hora.\n\n" +
@@ -171,8 +160,7 @@ client.on("messageCreate", async (message) => {
         "Bloquea un ataque y se destruye.\n\n" +
 
         "📡 AVISO\n" +
-        "La tienda está sujeta a cambios próximamente.\n" +
-        "Se añadirán nuevos ítems y mejoras.\n\n" +
+        "La tienda está sujeta a cambios próximamente.\n\n" +
 
         "📡 SISTEMA\n" +
         "• El sistema se encuentra estable y en funcionamiento\n" +
@@ -190,10 +178,11 @@ client.on("messageCreate", async (message) => {
 // ─────────────────────────────
 client.on(Events.InteractionCreate, async (interaction) => {
 
-  // 🛒 TIENDA
-  if (interaction.isStringSelectMenu() && interaction.customId === "shop_menu") {
+  if (!interaction.isStringSelectMenu()) return;
 
-    const option = interaction.values[0];
+  const option = interaction.values[0];
+
+  if (interaction.customId === "shop_menu") {
 
     if (option === "close") {
       await interaction.update({
@@ -218,8 +207,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     });
   }
 
-  // 👤 CONFIRM
-  if (interaction.isUserSelectMenu() && interaction.customId.startsWith("confirm_")) {
+  if (interaction.customId.startsWith("confirm_")) {
 
     const action = interaction.customId.split("_")[1];
     const targetId = interaction.values[0];
@@ -240,8 +228,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
     });
   }
 
-  // ⚡ EXECUTE (FIX INMUNIDAD AQUÍ)
-  if (interaction.isStringSelectMenu() && interaction.customId.startsWith("execute_")) {
+  // ⚡ EXECUTE
+  if (interaction.customId.startsWith("execute_")) {
 
     const [, action, targetId] = interaction.customId.split("_");
 
@@ -260,10 +248,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.update({ content: "usuario no encontrado", components: [] });
     }
 
-    // 🧷 ENCANDENAMIENTO (FIX INMUNIDAD)
-    if (action === "chain") {
+    const isImmune = IMMUNE_ROLES.some(r => target.roles.cache.has(r));
 
-      const isImmune = IMMUNE_ROLES.some(r => target.roles.cache.has(r));
+    if (action === "chain") {
 
       if (isImmune) {
         return interaction.update({
@@ -310,18 +297,47 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.update({ content: "🛡️ escudo activado", components: [] });
     }
 
+    // ✏️ RENOMBRAR (AHORA POR INPUT EN CHAT)
     if (action === "rename") {
 
-      const old = target.nickname || target.user.username;
+      await interaction.update({
+        content: `✏️ escribe en el chat el nuevo nombre para <@${targetId}> (30s)`,
+        components: []
+      });
 
-      await target.setNickname("MECHANIC USER");
-      await buyer.roles.remove(TOKENS_ROLE);
+      const filter = m =>
+        m.author.id === buyer.id &&
+        m.channel.id === interaction.channel.id;
 
-      setTimeout(async () => {
-        try { await target.setNickname(old); } catch {}
-      }, 40 * 60 * 1000);
+      try {
+        const collected = await interaction.channel.awaitMessages({
+          filter,
+          max: 1,
+          time: 30000,
+          errors: ["time"]
+        });
 
-      return interaction.update({ content: "✏️ renombrado aplicado", components: [] });
+        const newName = collected.first().content;
+        const old = target.nickname || target.user.username;
+
+        await target.setNickname(newName);
+        await buyer.roles.remove(TOKENS_ROLE);
+
+        setTimeout(async () => {
+          try { await target.setNickname(old); } catch {}
+        }, 40 * 60 * 1000);
+
+        return interaction.followUp({
+          content: `✏️ nombre cambiado a **${newName}**`,
+          ephemeral: true
+        });
+
+      } catch {
+        return interaction.followUp({
+          content: "❌ tiempo agotado, cancelado",
+          ephemeral: true
+        });
+      }
     }
   }
 });
