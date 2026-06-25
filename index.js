@@ -145,6 +145,10 @@ client.on("messageCreate", async (message) => {
       .setDescription(
         "```yaml\n" +
 
+        "📌 COMANDOS\n" +
+        ">call mechanic → abre la tienda\n" +
+        ">mechanic help → esta guía\n\n" +
+
         "🪙 TOKENS\n" +
         "Moneda del sistema usada para comprar ítems.\n\n" +
 
@@ -165,7 +169,10 @@ client.on("messageCreate", async (message) => {
 
         "📡 AVISO\n" +
         "La tienda está sujeta a cambios próximamente.\n" +
-        "Se añadirán nuevos ítems y mejoras.\n" +
+        "Se añadirán nuevos ítems y mejoras.\n\n" +
+
+        "📡 SISTEMA\n" +
+        "• El sistema se encuentra estable y en funcionamiento\n" +
 
         "```"
       )
