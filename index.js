@@ -42,9 +42,6 @@ const IMMUNE_ROLES = [
   "1427099549364781127"
 ];
 
-// 📡 LOG CHANNEL
-const LOG_CHANNEL = "1519438831479427192";
-
 // 📦 MONGO
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("📦 MongoDB conectado"))
@@ -61,6 +58,22 @@ const randomNames = [
   "Cazador", "Fantasma", "Vortex", "Draco", "Orion",
   "Lobo", "Ángel", "Demonio", "Neón", "Eco"
 ];
+
+// 💾 nombres originales
+const originalNames = new Map();
+
+// 🧠 SAFE ROLE REMOVE
+async function safeRemoveRole(member, roleId) {
+  try {
+    if (member.roles.cache.has(roleId)) {
+      await member.roles.remove(roleId);
+    }
+  } catch {
+    setTimeout(() => {
+      member.roles.remove(roleId).catch(() => {});
+    }, 10000);
+  }
+}
 
 // 🔥 TOKEN CONSUMER
 async function consumeToken(member) {
@@ -85,15 +98,11 @@ client.on("messageCreate", async (message) => {
   if (now - cd < 5000) return;
   cooldown.set(message.author.id, now);
 
-  if (message.mentions.has(client.user)) {
-    return message.reply("🤖 vuelve cuando tengas un token.");
-  }
-
   if (!message.content.startsWith(prefix)) return;
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
 
-  // 🛒 TIENDA
+  // 🛒 TIENDA COMPLETA RESTAURADA
   if (args[0] === "call" && args[1] === "mechanic") {
 
     if (!message.member.roles.cache.has(TOKENS_ROLE)) {
@@ -152,7 +161,6 @@ client.on("messageCreate", async (message) => {
         "```"
       )
       .setColor(0x8b5cf6)
-      .setImage("https://cdn.discordapp.com/attachments/1402268718360297544/1519443095379513496/E42BDE84-B055-4A1C-B788-620B7DC904AD.gif")
       .setFooter({ text: "🤖 MECHANIC SYSTEM ONLINE" });
 
     const menu = new ActionRowBuilder().addComponents(
@@ -177,10 +185,6 @@ client.on("messageCreate", async (message) => {
 
 // 🟣 INTERACTIONS
 client.on(Events.InteractionCreate, async (interaction) => {
-
-  if (!interaction.isStringSelectMenu() &&
-      !interaction.isUserSelectMenu() &&
-      !interaction.isModalSubmit()) return;
 
   if (interaction.isStringSelectMenu() && interaction.customId === "shop_menu") {
 
@@ -211,24 +215,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (!target) return interaction.reply({ content: "no encontrado", ephemeral: true });
 
-    const isBooster = target.roles.cache.has(BOOSTER_ROLE);
     const immune = IMMUNE_ROLES.some(r => target.roles.cache.has(r));
-
-    if (isBooster && (action === "rename" || action === "randomname")) {
-      return interaction.reply({ content: "🚫 booster protegido", ephemeral: true });
-    }
 
     let success = false;
 
-    const safeReply = (msg) =>
-      interaction.reply({ content: msg, ephemeral: true });
-
-    // ───────── ACTIONS ─────────
-
     if (action === "chain") {
-      if (immune) return safeReply("inmune");
+      if (immune) return interaction.reply({ content: "inmune", ephemeral: true });
+
       await target.roles.add(PRISON_ROLE);
-      setTimeout(() => target.roles.remove(PRISON_ROLE).catch(() => {}), 30 * 60000);
+      setTimeout(() => safeRemoveRole(target, PRISON_ROLE), 30 * 60000);
       success = true;
     }
 
@@ -239,13 +234,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (action === "immunity") {
       await target.roles.add(IMMUNITY_ROLE);
-      setTimeout(() => target.roles.remove(IMMUNITY_ROLE).catch(() => {}), 60 * 60000);
+      setTimeout(() => safeRemoveRole(target, IMMUNITY_ROLE), 60 * 60000);
       success = true;
     }
 
     if (action === "shield") {
       await target.roles.add(SHIELD_ROLE);
-      setTimeout(() => target.roles.remove(SHIELD_ROLE).catch(() => {}), 60 * 60000);
+      setTimeout(() => safeRemoveRole(target, SHIELD_ROLE), 60 * 60000);
       success = true;
     }
 
@@ -266,16 +261,26 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (action === "randomname") {
       const old = target.nickname || target.user.username;
 
+      if (!originalNames.has(target.id)) {
+        originalNames.set(target.id, old);
+      }
+
       let i = 0;
       const interval = setInterval(async () => {
         const name = randomNames[Math.floor(Math.random() * randomNames.length)];
-        try { await target.setNickname(name); } catch {}
+        try {
+          if (target.manageable) await target.setNickname(name);
+        } catch {}
         i++;
         if (i >= 3) clearInterval(interval);
       }, 20000);
 
-      setTimeout(() => {
-        target.setNickname(old).catch(() => {});
+      setTimeout(async () => {
+        const original = originalNames.get(target.id);
+        if (original && target.manageable) {
+          await target.setNickname(original).catch(() => {});
+        }
+        originalNames.delete(target.id);
       }, 60000);
 
       success = true;
@@ -283,16 +288,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (action === "extras") {
       await target.roles.add(EXTRA_ROLE);
-      setTimeout(() => target.roles.remove(EXTRA_ROLE).catch(() => {}), 60 * 60 * 1000);
+      setTimeout(() => safeRemoveRole(target, EXTRA_ROLE), 60 * 60 * 1000);
       success = true;
     }
 
-    // ───────── FINAL CHECK ─────────
     if (success) {
       const ok = await consumeToken(buyer);
-
       if (!ok) {
-        return interaction.reply({ content: "❌ no tenías token al final", ephemeral: true });
+        return interaction.reply({ content: "❌ no tenías token", ephemeral: true });
       }
 
       return interaction.update({
@@ -313,14 +316,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (!target) return interaction.reply({ content: "no encontrado", ephemeral: true });
 
-    await target.setNickname(newName);
+    const original = target.nickname || target.user.username;
+
+    try {
+      if (target.manageable) {
+        await target.setNickname(newName);
+      }
+    } catch {}
 
     setTimeout(() => {
-      target.setNickname(target.user.username).catch(() => {});
+      if (target.manageable) {
+        target.setNickname(original).catch(() => {});
+      }
     }, 40 * 60000);
 
     const ok = await consumeToken(buyer);
-
     if (!ok) {
       return interaction.reply({ content: "❌ no tenías token", ephemeral: true });
     }
