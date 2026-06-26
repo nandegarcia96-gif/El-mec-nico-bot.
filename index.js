@@ -13,7 +13,7 @@ const {
 
 const mongoose = require("mongoose");
 
-// 🧠 ANTI CRASH GLOBAL
+// 🧠 ANTI CRASH
 process.on("unhandledRejection", console.log);
 process.on("uncaughtException", console.log);
 
@@ -36,7 +36,6 @@ const IMMUNITY_ROLE = "1515011976621854790";
 const SHIELD_ROLE = "1449488332273877153";
 const EXTRA_ROLE = "1426678812443148430";
 
-// 🛡️ INMUNIDADES
 const IMMUNE_ROLES = [
   "1465082323220562013",
   "1426385179575975936",
@@ -44,10 +43,14 @@ const IMMUNE_ROLES = [
   "1427099549364781127"
 ];
 
-// 📦 MONGO
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("📦 MongoDB conectado"))
-  .catch(err => console.log("❌ Mongo error:", err));
+// 🔥 MONGO SAFE CONNECT
+if (process.env.MONGO_URI) {
+  mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log("📦 MongoDB conectado"))
+    .catch(err => console.log("❌ Mongo error:", err));
+} else {
+  console.log("❌ MONGO_URI no definida");
+}
 
 // 📌 SCHEMA
 const roleTimerSchema = new mongoose.Schema({
@@ -62,6 +65,7 @@ const RoleTimer = mongoose.model("RoleTimer", roleTimerSchema);
 // 💾 MEMORY
 const cooldown = new Map();
 const originalNames = new Map();
+const shopMessages = new Map();
 
 const randomNames = [
   "Sombra", "Fénix", "Rayo", "Titán", "Nómada",
@@ -69,7 +73,7 @@ const randomNames = [
   "Lobo", "Ángel", "Demonio", "Neón", "Eco"
 ];
 
-// 🔥 TOKEN CONSUME (AL FINAL)
+// 🔥 TOKEN (AL FINAL)
 async function consumeToken(member) {
   try {
     if (!member.roles.cache.has(TOKENS_ROLE)) return false;
@@ -80,7 +84,7 @@ async function consumeToken(member) {
   }
 }
 
-// 💾 TIMER DB
+// 💾 TIMER SYSTEM
 async function addRoleTimer(member, roleId, ms) {
   const expiresAt = new Date(Date.now() + ms);
 
@@ -96,14 +100,14 @@ async function addRoleTimer(member, roleId, ms) {
 
 // 🧹 CLEAN TIMERS
 async function checkTimers() {
-  const now = new Date();
+  try {
+    const now = new Date();
 
-  const expired = await RoleTimer.find({
-    expiresAt: { $lte: now }
-  });
+    const expired = await RoleTimer.find({
+      expiresAt: { $lte: now }
+    });
 
-  for (const t of expired) {
-    try {
+    for (const t of expired) {
       const guild = await client.guilds.fetch(t.guildId);
       const member = await guild.members.fetch(t.userId).catch(() => null);
 
@@ -112,7 +116,9 @@ async function checkTimers() {
       }
 
       await RoleTimer.deleteOne({ _id: t._id });
-    } catch {}
+    }
+  } catch (e) {
+    console.log(e);
   }
 }
 
@@ -121,10 +127,6 @@ client.on("messageCreate", async (message) => {
   try {
     if (message.author.bot) return;
     if (message.channel.id !== ALLOWED_CHANNEL) return;
-
-    const now = Date.now();
-    if ((cooldown.get(message.author.id) || 0) > now) return;
-    cooldown.set(message.author.id, now + 5000);
 
     if (!message.content.startsWith(">")) return;
 
@@ -138,52 +140,56 @@ client.on("messageCreate", async (message) => {
 
       const loading = await message.channel.send("🟣 ⚙️ iniciando sistema...");
 
-      // 🔥 TIENDA COMPLETA RESTAURADA
       const embed = new EmbedBuilder()
         .setTitle("🛒 ⚙️ THE MECHANIC STORE")
-        .setDescription(`
+        .setDescription(
+`\
 \`\`\`yaml
 
 🔗 ENCANDENAMIENTO
 🪙 1 TOKEN
 ⏳ 30 min
-⚙️ bloquea acceso a interacciones básicas
-🔗 restricción temporal de canales
+⚙️ bloquea acceso a interacciones básicas del sistema
+🔗 efecto temporal de restricción de canales
 
 ⛓️ LIBERACIÓN
 🪙 1 TOKEN
-⚙️ elimina encadenamiento
-⛓️‍💥 restaura acceso normal
+⚙️ elimina efecto de encadenamiento
+⛓️‍💥 restaura acceso normal del usuario
 
 ✏️ RENOMBRAR USUARIO
 🪙 1 TOKEN
 ⏳ 40 min
-⚙️ cambia nickname temporal
-✨ vuelve al original después
+⚙️ cambia nickname temporalmente
+✨ vuelve al nombre original al finalizar
 
 🛠️ PERMISOS EXTRAS
 🪙 1 TOKEN
 ⏳ 1 HORA
-⚙️ permisos avanzados
-💬 links, VC, archivos
+⚙️ permisos temporales avanzados
+💬 links, archivos, nombre y VC
 
 🎲 NOMBRES ALEATORIOS
 🪙 1 TOKEN
 ⏳ 1 min
-⚙️ cambia nombre constantemente
+⚙️ cambia el nombre del usuario constantemente
+💿 cada 10–15 segundos cambia
 
 🛡️ INMUNIDAD CD
 🪙 1 TOKEN
 ⏳ 1 HORA
-⚙️ ignora cooldown
+⚙️ ignora cooldown del servidor
+💬 uso continuo de acciones
 
 🛡️ ESCUDO
 🪙 1 TOKEN
 ⏳ 1 HORA
-⚙️ bloquea 1 acción
+⚙️ bloquea 1 acción del sistema
+🛡️ protección temporal
 
 \`\`\`
-        `)
+`
+        )
         .setColor(0x8b5cf6)
         .setImage("https://cdn.discordapp.com/attachments/1402268718360297544/1519443095379513496/E42BDE84-B055-4A1C-B788-620B7DC904AD.gif")
         .setFooter({ text: "🤖 MECHANIC SYSTEM ONLINE" });
@@ -202,10 +208,15 @@ client.on("messageCreate", async (message) => {
           ])
       );
 
-      await loading.edit({ embeds: [embed], components: [menu] });
+      const shopMsg = await loading.edit({
+        embeds: [embed],
+        components: [menu]
+      });
+
+      shopMessages.set(message.author.id, shopMsg);
     }
   } catch (e) {
-    console.log("message error:", e);
+    console.log(e);
   }
 });
 
@@ -273,19 +284,32 @@ client.on(Events.InteractionCreate, async (interaction) => {
         success = true;
       }
 
-      // 🔥 TOKEN SOLO AL FINAL
+      // 🔥 CIERRE TIENDA + TOKEN FINAL
       if (success) {
+
+        const shopMsg = shopMessages.get(interaction.member.id);
+
+        if (shopMsg) {
+          await shopMsg.edit({
+            content: "🟣 tienda cerrada",
+            embeds: [],
+            components: []
+          });
+
+          shopMessages.delete(interaction.member.id);
+        }
+
         await consumeToken(interaction.member);
 
         return interaction.editReply({
-          content: "🟣 compra completada correctamente + tienda cerrada",
+          content: "🟣 compra completada correctamente",
           components: []
         });
       }
     }
 
   } catch (e) {
-    console.log("interaction error:", e);
+    console.log(e);
   }
 });
 
@@ -293,12 +317,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 client.once(Events.ClientReady, async () => {
   console.log("🤖 mechanic online");
 
-  try {
-    await checkTimers();
-    setInterval(checkTimers, 60000);
-  } catch (e) {
-    console.log(e);
-  }
+  await checkTimers();
+  setInterval(checkTimers, 60000);
 });
 
 client.login(process.env.TOKEN);
