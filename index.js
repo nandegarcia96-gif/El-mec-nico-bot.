@@ -42,10 +42,14 @@ const IMMUNE_ROLES = [
   "1427099549364781127"
 ];
 
-// 📦 MONGO
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("📦 MongoDB conectado"))
-  .catch(err => console.log("❌ Mongo error:", err));
+// 📦 MONGO (SAFE)
+if (process.env.MONGO_URI) {
+  mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log("📦 MongoDB conectado"))
+    .catch(err => console.log("❌ Mongo error:", err));
+} else {
+  console.log("⚠️ MONGO_URI no definido, continuando sin DB...");
+}
 
 // 📌 SCHEMA TIMERS
 const roleTimerSchema = new mongoose.Schema({
@@ -57,12 +61,11 @@ const roleTimerSchema = new mongoose.Schema({
 
 const RoleTimer = mongoose.model("RoleTimer", roleTimerSchema);
 
-// 🧠 CONTROL DE TIENDA ABIERTA
-const storeMessages = new Map();
-
+// ⏱️ BASIC
 const prefix = ">";
 const cooldown = new Map();
 
+// 🎲 RANDOM NAMES
 const randomNames = [
   "Sombra", "Fénix", "Rayo", "Titán", "Nómada",
   "Cazador", "Fantasma", "Vortex", "Draco", "Orion",
@@ -71,10 +74,10 @@ const randomNames = [
 
 const originalNames = new Map();
 
-// 🧠 TOKEN CONSUMER (AL FINAL)
+// 🧠 TOKEN CONSUMER
 async function consumeToken(member) {
+  if (!member.roles.cache.has(TOKENS_ROLE)) return false;
   try {
-    if (!member.roles.cache.has(TOKENS_ROLE)) return false;
     await member.roles.remove(TOKENS_ROLE);
     return true;
   } catch {
@@ -82,7 +85,7 @@ async function consumeToken(member) {
   }
 }
 
-// 💾 ADD ROLE TIMER
+// 💾 ROLE TIMER
 async function addRoleTimer(member, roleId, ms) {
   const expiresAt = new Date(Date.now() + ms);
 
@@ -93,11 +96,13 @@ async function addRoleTimer(member, roleId, ms) {
     expiresAt
   });
 
-  await member.roles.add(roleId).catch(() => {});
+  await member.roles.add(roleId);
 }
 
-// 🧹 CHECK TIMERS
+// 🧹 CHECK TIMERS (PERSISTENTE)
 async function checkTimers() {
+  if (!RoleTimer) return;
+
   const now = new Date();
 
   const expired = await RoleTimer.find({
@@ -134,7 +139,7 @@ client.on("messageCreate", async (message) => {
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
 
-  // 🛒 TIENDA (INTACTA COMPLETA)
+  // 🛒 TIENDA COMPLETA (NO RECORTADA)
   if (args[0] === "call" && args[1] === "mechanic") {
 
     if (!message.member.roles.cache.has(TOKENS_ROLE)) {
@@ -181,7 +186,8 @@ client.on("messageCreate", async (message) => {
         "🛡️ INMUNIDAD CD\n" +
         "🪙 1 TOKEN\n" +
         "⏳ 1 HORA\n" +
-        "⚙️ ignora el cooldown del servidor\n\n" +
+        "⚙️ ignora el cooldown del servidor\n" +
+        "💬 permite uso continuo de acciones\n\n" +
 
         "🛡️ ESCUDO\n" +
         "🪙 1 TOKEN\n" +
@@ -192,6 +198,7 @@ client.on("messageCreate", async (message) => {
         "```"
       )
       .setColor(0x8b5cf6)
+      .setImage("https://cdn.discordapp.com/attachments/1402268718360297544/1519443095379513496/E42BDE84-B055-4A1C-B788-620B7DC904AD.gif")
       .setFooter({ text: "🤖 MECHANIC SYSTEM ONLINE" });
 
     const menu = new ActionRowBuilder().addComponents(
@@ -210,9 +217,12 @@ client.on("messageCreate", async (message) => {
         ])
     );
 
-    const msg = await loading.edit({ embeds: [embed], components: [menu] });
+    await loading.edit({ embeds: [embed], components: [menu] });
 
-    storeMessages.set(message.author.id, msg.id);
+    // 🧨 AUTO CLOSE (5 MIN)
+    setTimeout(() => {
+      loading.edit({ components: [] }).catch(() => {});
+    }, 5 * 60 * 1000);
   }
 });
 
@@ -321,16 +331,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (success) {
       const ok = await consumeToken(buyer);
-
       if (!ok) return interaction.reply({ content: "❌ no tenías token", ephemeral: true });
-
-      // 🧹 CERRAR TIENDA AUTOMÁTICAMENTE
-      const msgId = storeMessages.get(buyer.id);
-      if (msgId) {
-        const msg = await interaction.channel.messages.fetch(msgId).catch(() => null);
-        if (msg) await msg.delete().catch(() => {});
-        storeMessages.delete(buyer.id);
-      }
 
       return interaction.update({
         content: "🟣 compra completada correctamente",
@@ -339,13 +340,44 @@ client.on(Events.InteractionCreate, async (interaction) => {
       });
     }
   }
+
+  if (interaction.isModalSubmit() && interaction.customId.startsWith("rename_")) {
+
+    const targetId = interaction.customId.split("_")[1];
+    const newName = interaction.fields.getTextInputValue("new_name");
+
+    const target = await interaction.guild.members.fetch(targetId).catch(() => null);
+    const buyer = interaction.member;
+
+    if (!target) return interaction.reply({ content: "no encontrado", ephemeral: true });
+
+    const original = target.nickname || target.user.username;
+
+    if (target.manageable) {
+      await target.setNickname(newName).catch(() => {});
+    }
+
+    setTimeout(() => {
+      if (target.manageable) {
+        target.setNickname(original).catch(() => {});
+      }
+    }, 40 * 60000);
+
+    const ok = await consumeToken(buyer);
+    if (!ok) return interaction.reply({ content: "❌ no tenías token", ephemeral: true });
+
+    return interaction.reply({ content: "cambiado", ephemeral: true });
+  }
 });
 
 // 🚀 START
 client.once(Events.ClientReady, async () => {
   console.log("🤖 mechanic online");
-  await checkTimers();
-  setInterval(checkTimers, 60000);
+
+  if (RoleTimer) {
+    await checkTimers();
+    setInterval(checkTimers, 60 * 1000);
+  }
 });
 
 client.login(process.env.TOKEN);
