@@ -13,10 +13,6 @@ const {
 
 const mongoose = require("mongoose");
 
-// 🚨 GLOBAL CRASH PROTECTION
-process.on("unhandledRejection", (e) => console.log("⚠️ Rejection:", e));
-process.on("uncaughtException", (e) => console.log("⚠️ Exception:", e));
-
 // 🤖 CLIENTE
 const client = new Client({
   intents: [
@@ -27,58 +23,54 @@ const client = new Client({
   ]
 });
 
-// 🔐 CONFIG
+// 🔐 CANAL PERMITIDO
 const ALLOWED_CHANNEL = "1519418226973347992";
 
+// 🔐 ROLES
 const TOKENS_ROLE = "1517347810167619697";
 const PRISON_ROLE = "1459458843816759412";
 const IMMUNITY_ROLE = "1515011976621854790";
 const SHIELD_ROLE = "1449488332273877153";
+const BOOSTER_ROLE = "1427099549364781127";
 const EXTRA_ROLE = "1426678812443148430";
 
-// 🧠 SAFE MONGO
-let RoleTimer = null;
+// 🛡️ INMUNIDADES
+const IMMUNE_ROLES = [
+  "1465082323220562013",
+  "1426385179575975936",
+  "1427393145993429063",
+  "1427099549364781127"
+];
 
-if (process.env.MONGO_URI) {
-  mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log("📦 Mongo conectado"))
-    .catch(e => console.log("❌ Mongo error:", e));
+// 📦 MONGO
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("📦 MongoDB conectado"))
+  .catch(err => console.log("❌ Mongo error:", err));
 
-  const schema = new mongoose.Schema({
-    guildId: String,
-    userId: String,
-    roleId: String,
-    expiresAt: Date
-  });
+// 📌 SCHEMA TIMERS
+const roleTimerSchema = new mongoose.Schema({
+  guildId: String,
+  userId: String,
+  roleId: String,
+  expiresAt: Date
+});
 
-  RoleTimer = mongoose.model("RoleTimer", schema);
-} else {
-  console.log("⚠️ Mongo desactivado (modo seguro)");
+const RoleTimer = mongoose.model("RoleTimer", roleTimerSchema);
 
-  const memory = [];
-
-  RoleTimer = {
-    async create(d) { memory.push(d); },
-    async find() {
-      const now = new Date();
-      return memory.filter(x => x.expiresAt <= now);
-    },
-    async deleteOne(f) {},
-    async deleteMany(f) {}
-  };
-}
+// ⏱️ COOLDOWN
+const cooldown = new Map();
 
 // 🎲 RANDOM NAMES
 const randomNames = [
-  "Sombra","Fénix","Rayo","Titán","Nómada",
-  "Cazador","Fantasma","Vortex","Draco","Orion",
-  "Lobo","Ángel","Demonio","Neón","Eco"
+  "Sombra", "Fénix", "Rayo", "Titán", "Nómada",
+  "Cazador", "Fantasma", "Vortex", "Draco", "Orion",
+  "Lobo", "Ángel", "Demonio", "Neón", "Eco"
 ];
 
-// 💾 ORIGINAL NAMES
+// 💾 backup nombres
 const originalNames = new Map();
 
-// 💰 TOKEN
+// 🧠 TOKEN CONSUMER (SOLO AL FINAL)
 async function consumeToken(member) {
   if (!member.roles.cache.has(TOKENS_ROLE)) return false;
   try {
@@ -89,7 +81,7 @@ async function consumeToken(member) {
   }
 }
 
-// 🧠 ROLE TIMER
+// 💾 ROLE TIMER (MONGO)
 async function addRoleTimer(member, roleId, ms) {
   const expiresAt = new Date(Date.now() + ms);
 
@@ -103,223 +95,261 @@ async function addRoleTimer(member, roleId, ms) {
   await member.roles.add(roleId);
 }
 
-// 🧹 CHECK TIMER
+// 🧹 CHECK EXPIRATIONS (REINICIO SAFE)
 async function checkTimers() {
-  try {
-    const expired = await RoleTimer.find({});
+  const now = new Date();
 
-    for (const t of expired) {
-      const guild = await client.guilds.fetch(t.guildId).catch(() => null);
-      if (!guild) continue;
+  const expired = await RoleTimer.find({ expiresAt: { $lte: now } });
 
+  for (const t of expired) {
+    try {
+      const guild = await client.guilds.fetch(t.guildId);
       const member = await guild.members.fetch(t.userId).catch(() => null);
-      if (member) await member.roles.remove(t.roleId).catch(() => {});
 
-      await RoleTimer.deleteOne({ _id: t._id }).catch(() => {});
-    }
-  } catch {}
-}
-
-// 📦 COOLDOWN
-const cooldown = new Map();
-
-// 🟣 MESSAGE
-client.on("messageCreate", async (message) => {
-  try {
-    if (message.author.bot) return;
-    if (message.channel.id !== ALLOWED_CHANNEL) return;
-
-    const now = Date.now();
-    if (cooldown.has(message.author.id) && now - cooldown.get(message.author.id) < 5000) return;
-    cooldown.set(message.author.id, now);
-
-    if (!message.content.startsWith(">")) return;
-
-    const args = message.content.slice(1).trim().split(/ +/);
-
-    // 🛒 TIENDA (INTACTA)
-    if (args[0] === "call" && args[1] === "mechanic") {
-
-      if (!message.member.roles.cache.has(TOKENS_ROLE)) {
-        return message.reply("🤖 vuelve cuando tengas un token.");
+      if (member) {
+        await member.roles.remove(t.roleId).catch(() => {});
       }
 
-      const loading = await message.channel.send("🟣 ⚙️ iniciando sistema...");
-      await new Promise(r => setTimeout(r, 1200));
+      await RoleTimer.deleteOne({ _id: t._id });
+    } catch {}
+  }
+}
 
-      const embed = new EmbedBuilder()
-        .setTitle("🛒 ⚙️ THE MECHANIC STORE")
-        .setDescription(
-`🔗 ENCANDENAMIENTO
-🪙 1 TOKEN
-⏳ 30 min
-⚙️ bloquea acceso a interacciones básicas del sistema
-🔗 efecto temporal de restricción de canales
+// 🟣 MESSAGE SYSTEM
+client.on("messageCreate", async (message) => {
 
-⛓️ LIBERACIÓN
-🪙 1 TOKEN
-⚙️ elimina el efecto de encadenamiento
-⛓️‍💥 restaura el acceso normal del usuario
+  if (message.author.bot) return;
+  if (message.channel.id !== ALLOWED_CHANNEL) return;
 
-✏️ RENOMBRAR USUARIO
-🪙 1 TOKEN
-⏳ 40 min
-⚙️ cambia el nickname del usuario temporalmente
-✨ vuelve al nombre original al finalizar
+  const now = Date.now();
+  const cd = cooldown.get(message.author.id) || 0;
 
-🛠️ PERMISOS EXTRAS
-🪙 1 TOKEN
-⏳ 1 HORA
-⚙️ permisos temporales avanzados
-💬 links, archivos, nombre y VC
+  if (now - cd < 5000) return;
+  cooldown.set(message.author.id, now);
 
-🎲 NOMBRES ALEATORIOS
-🪙 1 TOKEN
-⏳ 1 min
-⚙️ cambia el nombre del usuario constantemente
-💿 cada 10–15 segundos cambia a un nombre
+  if (!message.content.startsWith(">")) return;
 
-🛡️ INMUNIDAD CD
-🪙 1 TOKEN
-⏳ 1 HORA
-⚙️ ignora el cooldown del servidor
+  const args = message.content.slice(1).trim().split(/ +/);
 
-🛡️ ESCUDO
-🪙 1 TOKEN
-⏳ 1 HORA
-⚙️ bloquea 1 acción recibida del sistema
-🛡️ protege contra un efecto`
-        )
-        .setColor(0x8b5cf6);
+  if (args[0] === "call" && args[1] === "mechanic") {
 
-      const menu = new ActionRowBuilder().addComponents(
-        new StringSelectMenuBuilder()
-          .setCustomId("shop_menu")
-          .setPlaceholder("seleccionar módulo")
-          .addOptions([
-            { label: "Encadenar", value: "chain", emoji: "🧷" },
-            { label: "Liberación", value: "release", emoji: "⛓️‍💥" },
-            { label: "Renombrar", value: "rename", emoji: "✏️" },
-            { label: "Random Name", value: "randomname", emoji: "🎲" },
-            { label: "Inmunidad CD", value: "immunity", emoji: "🛡️" },
-            { label: "Escudo", value: "shield", emoji: "🛡️" },
-            { label: "Permisos Extras", value: "extras", emoji: "🔓" },
-            { label: "Cerrar", value: "close", emoji: "❌" }
-          ])
-      );
-
-      await loading.edit({ embeds: [embed], components: [menu] });
+    if (!message.member.roles.cache.has(TOKENS_ROLE)) {
+      return message.reply("🤖 vuelve cuando tengas un token.");
     }
-  } catch (e) {
-    console.log("messageCreate error:", e);
+
+    const loading = await message.channel.send("🟣 ⚙️ iniciando sistema...");
+    await new Promise(r => setTimeout(r, 1200));
+
+    const embed = new EmbedBuilder()
+      .setTitle("🛒 ⚙️ THE MECHANIC STORE")
+      .setDescription(
+        "```yaml\n" +
+
+        "🔗 ENCANDENAMIENTO\n" +
+        "🪙 1 TOKEN\n" +
+        "⏳ 5 min\n" +
+        "⚙️ bloquea acceso a interacciones básicas del sistema\n" +
+        "🔗 efecto temporal de restricción de canales\n\n" +
+
+        "⛓️ LIBERACIÓN\n" +
+        "🪙 1 TOKEN\n" +
+        "⚙️ elimina el efecto de encadenamiento\n" +
+        "⛓️‍💥 restaura el acceso normal del usuario\n\n" +
+
+        "✏️ RENOMBRAR USUARIO\n" +
+        "🪙 1 TOKEN\n" +
+        "⏳ 1 min\n" +
+        "⚙️ cambia el nickname del usuario temporalmente\n" +
+        "✨ vuelve al nombre original al finalizar\n\n" +
+
+        "🛠️ PERMISOS EXTRAS\n" +
+        "🪙 1 TOKEN\n" +
+        "⏳ 1 HORA\n" +
+        "⚙️ permisos temporales avanzados\n\n" +
+
+        "🎲 NOMBRES ALEATORIOS\n" +
+        "🪙 1 TOKEN\n" +
+        "⏳ 1 min\n" +
+        "⚙️ cambia el nombre del usuario constantemente\n\n" +
+
+        "🛡️ INMUNIDAD CD\n" +
+        "🪙 1 TOKEN\n" +
+        "⏳ 1 HORA\n\n" +
+
+        "🛡️ ESCUDO\n" +
+        "🪙 1 TOKEN\n" +
+        "⏳ 1 HORA\n" +
+
+        "```"
+      )
+      .setColor(0x8b5cf6)
+      .setImage("https://cdn.discordapp.com/attachments/1402268718360297544/1519443095379513496/E42BDE84-B055-4A1C-B788-620B7DC904AD.gif")
+      .setFooter({ text: "🤖 MECHANIC SYSTEM ONLINE" });
+
+    const menu = new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId("shop_menu")
+        .setPlaceholder("seleccionar módulo")
+        .addOptions([
+          { label: "Encadenar", value: "chain", emoji: "🧷" },
+          { label: "Liberación", value: "release", emoji: "⛓️‍💥" },
+          { label: "Renombrar", value: "rename", emoji: "✏️" },
+          { label: "Random Name", value: "randomname", emoji: "🎲" },
+          { label: "Inmunidad CD", value: "immunity", emoji: "🛡️" },
+          { label: "Escudo", value: "shield", emoji: "🛡️" },
+          { label: "Permisos Extras", value: "extras", emoji: "🔓" },
+          { label: "Cerrar", value: "close", emoji: "❌" }
+        ])
+    );
+
+    await loading.edit({ embeds: [embed], components: [menu] });
   }
 });
 
 // 🟣 INTERACTIONS
 client.on(Events.InteractionCreate, async (interaction) => {
-  try {
 
-    if (interaction.isStringSelectMenu() && interaction.customId === "shop_menu") {
+  if (interaction.isStringSelectMenu() && interaction.customId === "shop_menu") {
 
-      if (interaction.values[0] === "close") {
-        return interaction.update({ content: "cerrado", embeds: [], components: [] });
+    if (interaction.values[0] === "close") {
+      return interaction.update({ content: "cerrado", embeds: [], components: [] });
+    }
+
+    return interaction.reply({
+      content: "elige usuario:",
+      ephemeral: true,
+      components: [
+        new ActionRowBuilder().addComponents(
+          new UserSelectMenuBuilder()
+            .setCustomId(`user_${interaction.values[0]}`)
+            .setMaxValues(1)
+        )
+      ]
+    });
+  }
+
+  if (interaction.isUserSelectMenu()) {
+
+    const action = interaction.customId.split("_")[1];
+    const targetId = interaction.values[0];
+
+    const target = await interaction.guild.members.fetch(targetId).catch(() => null);
+    const buyer = interaction.member;
+
+    if (!target) return interaction.reply({ content: "no encontrado", ephemeral: true });
+
+    let success = false;
+
+    // ⛓ 5 MIN
+    if (action === "chain") {
+      await addRoleTimer(target, PRISON_ROLE, 5 * 60000);
+      success = true;
+    }
+
+    if (action === "release") {
+      await target.roles.remove(PRISON_ROLE);
+      await RoleTimer.deleteMany({ userId: target.id, roleId: PRISON_ROLE });
+      success = true;
+    }
+
+    if (action === "immunity") {
+      await addRoleTimer(target, IMMUNITY_ROLE, 60 * 60000);
+      success = true;
+    }
+
+    if (action === "shield") {
+      await addRoleTimer(target, SHIELD_ROLE, 60 * 60000);
+      success = true;
+    }
+
+    if (action === "extras") {
+      await addRoleTimer(target, EXTRA_ROLE, 60 * 60000);
+      success = true;
+    }
+
+    // ✏️ 1 MIN + RESTORE
+    if (action === "rename") {
+      const modal = new ModalBuilder()
+        .setCustomId(`rename_${targetId}`)
+        .setTitle("renombrar usuario");
+
+      const input = new TextInputBuilder()
+        .setCustomId("new_name")
+        .setLabel("nuevo nombre")
+        .setStyle(TextInputStyle.Short);
+
+      modal.addComponents(new ActionRowBuilder().addComponents(input));
+      return interaction.showModal(modal);
+    }
+
+    // 🎲 RANDOM 1 MIN + RESTORE
+    if (action === "randomname") {
+      const old = target.nickname || target.user.username;
+
+      if (!originalNames.has(target.id)) {
+        originalNames.set(target.id, old);
       }
 
-      return interaction.reply({
-        content: "elige usuario:",
-        ephemeral: true,
-        components: [
-          new ActionRowBuilder().addComponents(
-            new UserSelectMenuBuilder()
-              .setCustomId(`user_${interaction.values[0]}`)
-              .setMaxValues(1)
-          )
-        ]
+      let i = 0;
+      const interval = setInterval(async () => {
+        const name = randomNames[Math.floor(Math.random() * randomNames.length)];
+        if (target.manageable) await target.setNickname(name).catch(() => {});
+        i++;
+        if (i >= 3) clearInterval(interval);
+      }, 20000);
+
+      setTimeout(async () => {
+        const original = originalNames.get(target.id);
+        if (original && target.manageable) {
+          await target.setNickname(original).catch(() => {});
+        }
+        originalNames.delete(target.id);
+      }, 60000);
+
+      success = true;
+    }
+
+    if (success) {
+      const ok = await consumeToken(buyer);
+
+      if (!ok) return interaction.reply({ content: "❌ sin token", ephemeral: true });
+
+      return interaction.update({
+        content: "🟣 compra completada",
+        embeds: [],
+        components: []
       });
     }
+  }
 
-    if (interaction.isUserSelectMenu()) {
+  if (interaction.isModalSubmit() && interaction.customId.startsWith("rename_")) {
 
-      const action = interaction.customId.split("_")[1];
-      const target = await interaction.guild.members.fetch(interaction.values[0]).catch(() => null);
-      const buyer = interaction.member;
+    const targetId = interaction.customId.split("_")[1];
+    const newName = interaction.fields.getTextInputValue("new_name");
 
-      if (!target) return interaction.reply({ content: "no encontrado", ephemeral: true });
+    const target = await interaction.guild.members.fetch(targetId).catch(() => null);
 
-      let success = false;
+    const original = target.nickname || target.user.username;
 
-      // ⛓ 5 MIN
-      if (action === "chain") {
-        await addRoleTimer(target, PRISON_ROLE, 5 * 60000);
-        success = true;
-      }
-
-      if (action === "immunity") {
-        await addRoleTimer(target, IMMUNITY_ROLE, 60 * 60000);
-        success = true;
-      }
-
-      if (action === "shield") {
-        await addRoleTimer(target, SHIELD_ROLE, 60 * 60000);
-        success = true;
-      }
-
-      if (action === "extras") {
-        await addRoleTimer(target, EXTRA_ROLE, 60 * 60000);
-        success = true;
-      }
-
-      // ✏️ 1 MIN
-      if (action === "rename") {
-        const old = target.nickname || target.user.username;
-        await target.setNickname("TEMP").catch(() => {});
-        setTimeout(() => target.setNickname(old).catch(() => {}), 60000);
-        success = true;
-      }
-
-      // 🎲 1 MIN
-      if (action === "randomname") {
-        const old = target.nickname || target.user.username;
-
-        const interval = setInterval(async () => {
-          const n = randomNames[Math.floor(Math.random() * randomNames.length)];
-          await target.setNickname(n).catch(() => {});
-        }, 15000);
-
-        setTimeout(() => {
-          clearInterval(interval);
-          target.setNickname(old).catch(() => {});
-        }, 60000);
-
-        success = true;
-      }
-
-      if (action === "release") {
-        await target.roles.remove(PRISON_ROLE);
-        success = true;
-      }
-
-      // 💰 TOKEN AL FINAL + CIERRE TIENDA
-      if (success) {
-        const ok = await consumeToken(buyer);
-        if (!ok) return interaction.reply({ content: "❌ sin token", ephemeral: true });
-
-        return interaction.update({
-          content: "🟣 compra completada",
-          embeds: [],
-          components: []
-        });
-      }
+    if (target.manageable) {
+      await target.setNickname(newName).catch(() => {});
     }
 
-  } catch (e) {
-    console.log("interaction error:", e);
+    setTimeout(() => {
+      if (target.manageable) {
+        target.setNickname(original).catch(() => {});
+      }
+    }, 60000);
+
+    const ok = await consumeToken(interaction.member);
+
+    return interaction.reply({ content: ok ? "cambiado" : "❌ sin token", ephemeral: true });
   }
 });
 
-// 🚀 START
-client.once(Events.ClientReady, () => {
-  console.log("🤖 bot online");
+client.once(Events.ClientReady, async () => {
+  console.log("🤖 mechanic online");
+  await checkTimers();
   setInterval(checkTimers, 60000);
 });
 
