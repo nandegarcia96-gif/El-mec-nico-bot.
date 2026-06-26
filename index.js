@@ -55,7 +55,7 @@ const roleTimerSchema = new mongoose.Schema({
   expiresAt: Date
 });
 
-const RoleTimer = mongoose.model("RoleTimer", roleTimerSchema);
+const RoleTimer = mongoose.models.RoleTimer || mongoose.model("RoleTimer", roleTimerSchema);
 
 // ⏱️ COOLDOWN
 const cooldown = new Map();
@@ -117,7 +117,6 @@ async function checkTimers() {
 
 // 🟣 MESSAGE SYSTEM
 client.on("messageCreate", async (message) => {
-
   if (message.author.bot) return;
   if (message.channel.id !== ALLOWED_CHANNEL) return;
 
@@ -132,7 +131,6 @@ client.on("messageCreate", async (message) => {
   const args = message.content.slice(1).trim().split(/ +/);
 
   if (args[0] === "call" && args[1] === "mechanic") {
-
     if (!message.member.roles.cache.has(TOKENS_ROLE)) {
       return message.reply("🤖 vuelve cuando tengas un token.");
     }
@@ -174,11 +172,13 @@ client.on("messageCreate", async (message) => {
 
         "🛡️ INMUNIDAD CD\n" +
         "🪙 1 TOKEN\n" +
-        "⏳ 1 HORA\n\n" +
+        "⏳ 1 HORA\n" +
+        "⚙️ te hace inmune al modo lento durante 1 hora\n\n" +
 
         "🛡️ ESCUDO\n" +
         "🪙 1 TOKEN\n" +
         "⏳ 1 HORA\n" +
+        "⚙️ te protege de cualquier posible efecto\n" +
 
         "```"
       )
@@ -211,6 +211,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   if (interaction.isStringSelectMenu() && interaction.customId === "shop_menu") {
 
+    if (!interaction.member.roles.cache.has(TOKENS_ROLE)) {
+      return interaction.reply({
+        content: "❌ necesitas un token para abrir la tienda.",
+        ephemeral: true
+      });
+    }
+
     if (interaction.values[0] === "close") {
       return interaction.update({ content: "cerrado", embeds: [], components: [] });
     }
@@ -230,17 +237,24 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   if (interaction.isUserSelectMenu()) {
 
+    const buyer = interaction.member;
+
+    if (!buyer.roles.cache.has(TOKENS_ROLE)) {
+      return interaction.reply({
+        content: "❌ No tienes tokens para usar la tienda.",
+        ephemeral: true
+      });
+    }
+
     const action = interaction.customId.split("_")[1];
     const targetId = interaction.values[0];
 
     const target = await interaction.guild.members.fetch(targetId).catch(() => null);
-    const buyer = interaction.member;
 
     if (!target) return interaction.reply({ content: "no encontrado", ephemeral: true });
 
     let success = false;
 
-    // ⛓ 5 MIN
     if (action === "chain") {
       await addRoleTimer(target, PRISON_ROLE, 5 * 60000);
       success = true;
@@ -267,7 +281,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       success = true;
     }
 
-    // ✏️ 1 MIN + RESTORE
     if (action === "rename") {
       const modal = new ModalBuilder()
         .setCustomId(`rename_${targetId}`)
@@ -282,7 +295,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.showModal(modal);
     }
 
-    // 🎲 RANDOM 1 MIN + RESTORE
     if (action === "randomname") {
       const old = target.nickname || target.user.username;
 
