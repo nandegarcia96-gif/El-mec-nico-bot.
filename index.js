@@ -43,15 +43,21 @@ const IMMUNE_ROLES = [
 ];
 
 // 📦 MONGO
+if (!process.env.MONGO_URI) {
+  console.log("❌ MONGO_URI no definida");
+}
+
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("📦 MongoDB conectado"))
   .catch(err => console.log("❌ Mongo error:", err));
 
-// 📌 SCHEMA TIMERS
+// 📌 SCHEMA TIMERS (MONGO PERSISTENTE)
 const roleTimerSchema = new mongoose.Schema({
   guildId: String,
   userId: String,
   roleId: String,
+  type: String,
+  data: Object,
   expiresAt: Date
 });
 
@@ -70,7 +76,7 @@ const randomNames = [
 // 💾 backup nombres
 const originalNames = new Map();
 
-// 🧠 TOKEN CONSUMER (SOLO AL FINAL)
+// 🧠 TOKEN CONSUMER
 async function consumeToken(member) {
   if (!member.roles.cache.has(TOKENS_ROLE)) return false;
   try {
@@ -81,18 +87,22 @@ async function consumeToken(member) {
   }
 }
 
-// 💾 ROLE TIMER (MONGO)
-async function addRoleTimer(member, roleId, ms) {
+// 💾 TIMER UNIVERSAL (TODO MONGO)
+async function addTimer(member, type, roleId, ms, data = {}) {
   const expiresAt = new Date(Date.now() + ms);
 
   await RoleTimer.create({
     guildId: member.guild.id,
     userId: member.id,
     roleId,
+    type,
+    data,
     expiresAt
   });
 
-  await member.roles.add(roleId);
+  if (roleId) {
+    await member.roles.add(roleId).catch(() => {});
+  }
 }
 
 // 🧹 CHECK EXPIRATIONS (REINICIO SAFE)
@@ -106,8 +116,40 @@ async function checkTimers() {
       const guild = await client.guilds.fetch(t.guildId);
       const member = await guild.members.fetch(t.userId).catch(() => null);
 
-      if (member) {
+      if (!member) continue;
+
+      // ⛓ PRISON
+      if (t.type === "prison") {
         await member.roles.remove(t.roleId).catch(() => {});
+      }
+
+      // 🛡 IMMUNITY
+      if (t.type === "immunity") {
+        await member.roles.remove(t.roleId).catch(() => {});
+      }
+
+      // 🛡 SHIELD
+      if (t.type === "shield") {
+        await member.roles.remove(t.roleId).catch(() => {});
+      }
+
+      // 🔓 EXTRAS
+      if (t.type === "extras") {
+        await member.roles.remove(t.roleId).catch(() => {});
+      }
+
+      // ✏️ RENAME RESTORE
+      if (t.type === "rename") {
+        if (member.manageable && t.data?.oldName) {
+          await member.setNickname(t.data.oldName).catch(() => {});
+        }
+      }
+
+      // 🎲 RANDOM NAME RESTORE
+      if (t.type === "randomname") {
+        if (member.manageable && t.data?.oldName) {
+          await member.setNickname(t.data.oldName).catch(() => {});
+        }
       }
 
       await RoleTimer.deleteOne({ _id: t._id });
@@ -173,12 +215,12 @@ client.on("messageCreate", async (message) => {
         "🛡️ INMUNIDAD CD\n" +
         "🪙 1 TOKEN\n" +
         "⏳ 1 HORA\n" +
-        "⚙️ te hace inmune al modo lento durante 1 hora\n\n" +
+        "⚙️ te da inmunidad al modo lento\n\n" +
 
         "🛡️ ESCUDO\n" +
         "🪙 1 TOKEN\n" +
         "⏳ 1 HORA\n" +
-        "⚙️ te protege de cualquier posible efecto\n" +
+        "⚙️ te protege contra cualquier efecto\n" +
 
         "```"
       )
@@ -250,13 +292,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const targetId = interaction.values[0];
 
     const target = await interaction.guild.members.fetch(targetId).catch(() => null);
-
     if (!target) return interaction.reply({ content: "no encontrado", ephemeral: true });
 
     let success = false;
 
     if (action === "chain") {
-      await addRoleTimer(target, PRISON_ROLE, 5 * 60000);
+      await addTimer(target, "prison", PRISON_ROLE, 5 * 60000);
       success = true;
     }
 
@@ -267,40 +308,48 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 
     if (action === "immunity") {
-      await addRoleTimer(target, IMMUNITY_ROLE, 60 * 60000);
+      await addTimer(target, "immunity", IMMUNITY_ROLE, 60 * 60000);
       success = true;
     }
 
     if (action === "shield") {
-      await addRoleTimer(target, SHIELD_ROLE, 60 * 60000);
+      await addTimer(target, "shield", SHIELD_ROLE, 60 * 60000);
       success = true;
     }
 
     if (action === "extras") {
-      await addRoleTimer(target, EXTRA_ROLE, 60 * 60000);
+      await addTimer(target, "extras", EXTRA_ROLE, 60 * 60000);
       success = true;
     }
 
     if (action === "rename") {
-      const modal = new ModalBuilder()
-        .setCustomId(`rename_${targetId}`)
-        .setTitle("renombrar usuario");
+      const old = target.nickname || target.user.username;
 
-      const input = new TextInputBuilder()
-        .setCustomId("new_name")
-        .setLabel("nuevo nombre")
-        .setStyle(TextInputStyle.Short);
+      await addTimer(target, "rename", null, 60000, {
+        oldName: old
+      });
 
-      modal.addComponents(new ActionRowBuilder().addComponents(input));
-      return interaction.showModal(modal);
+      if (target.manageable) {
+        const modal = new ModalBuilder()
+          .setCustomId(`rename_${targetId}`)
+          .setTitle("renombrar usuario");
+
+        const input = new TextInputBuilder()
+          .setCustomId("new_name")
+          .setLabel("nuevo nombre")
+          .setStyle(TextInputStyle.Short);
+
+        modal.addComponents(new ActionRowBuilder().addComponents(input));
+        return interaction.showModal(modal);
+      }
     }
 
     if (action === "randomname") {
       const old = target.nickname || target.user.username;
 
-      if (!originalNames.has(target.id)) {
-        originalNames.set(target.id, old);
-      }
+      await addTimer(target, "randomname", null, 60000, {
+        oldName: old
+      });
 
       let i = 0;
       const interval = setInterval(async () => {
@@ -309,14 +358,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         i++;
         if (i >= 3) clearInterval(interval);
       }, 20000);
-
-      setTimeout(async () => {
-        const original = originalNames.get(target.id);
-        if (original && target.manageable) {
-          await target.setNickname(original).catch(() => {});
-        }
-        originalNames.delete(target.id);
-      }, 60000);
 
       success = true;
     }
@@ -341,21 +382,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     const target = await interaction.guild.members.fetch(targetId).catch(() => null);
 
-    const original = target.nickname || target.user.username;
-
-    if (target.manageable) {
+    if (target?.manageable) {
       await target.setNickname(newName).catch(() => {});
     }
 
-    setTimeout(() => {
-      if (target.manageable) {
-        target.setNickname(original).catch(() => {});
-      }
-    }, 60000);
-
     const ok = await consumeToken(interaction.member);
 
-    return interaction.reply({ content: ok ? "cambiado" : "❌ sin token", ephemeral: true });
+    return interaction.reply({
+      content: ok ? "cambiado" : "❌ sin token",
+      ephemeral: true
+    });
   }
 });
 
