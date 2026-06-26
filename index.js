@@ -47,35 +47,28 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("📦 MongoDB conectado"))
   .catch(err => console.log("❌ Mongo error:", err));
 
-const prefix = ">";
+// 📌 SCHEMA TIMERS
+const roleTimerSchema = new mongoose.Schema({
+  guildId: String,
+  userId: String,
+  roleId: String,
+  expiresAt: Date
+});
 
-// ⏱️ COOLDOWN
+const RoleTimer = mongoose.model("RoleTimer", roleTimerSchema);
+
+const prefix = ">";
 const cooldown = new Map();
 
-// 🎲 RANDOM NAMES
 const randomNames = [
   "Sombra", "Fénix", "Rayo", "Titán", "Nómada",
   "Cazador", "Fantasma", "Vortex", "Draco", "Orion",
   "Lobo", "Ángel", "Demonio", "Neón", "Eco"
 ];
 
-// 💾 nombres originales
 const originalNames = new Map();
 
-// 🧠 SAFE ROLE REMOVE
-async function safeRemoveRole(member, roleId) {
-  try {
-    if (member.roles.cache.has(roleId)) {
-      await member.roles.remove(roleId);
-    }
-  } catch {
-    setTimeout(() => {
-      member.roles.remove(roleId).catch(() => {});
-    }, 10000);
-  }
-}
-
-// 🔥 TOKEN CONSUMER
+// 🧠 TOKEN CONSUMER
 async function consumeToken(member) {
   if (!member.roles.cache.has(TOKENS_ROLE)) return false;
   try {
@@ -83,6 +76,42 @@ async function consumeToken(member) {
     return true;
   } catch {
     return false;
+  }
+}
+
+// 💾 ADD ROLE TIMER (MONGO)
+async function addRoleTimer(member, roleId, ms) {
+  const expiresAt = new Date(Date.now() + ms);
+
+  await RoleTimer.create({
+    guildId: member.guild.id,
+    userId: member.id,
+    roleId,
+    expiresAt
+  });
+
+  await member.roles.add(roleId);
+}
+
+// 🧹 CHECK EXPIRATIONS
+async function checkTimers() {
+  const now = new Date();
+
+  const expired = await RoleTimer.find({
+    expiresAt: { $lte: now }
+  });
+
+  for (const t of expired) {
+    try {
+      const guild = await client.guilds.fetch(t.guildId);
+      const member = await guild.members.fetch(t.userId).catch(() => null);
+
+      if (member) {
+        await member.roles.remove(t.roleId).catch(() => {});
+      }
+
+      await RoleTimer.deleteOne({ _id: t._id });
+    } catch {}
   }
 }
 
@@ -102,7 +131,7 @@ client.on("messageCreate", async (message) => {
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
 
-  // 🛒 TIENDA COMPLETA RESTAURADA
+  // 🛒 TIENDA COMPLETA RESTAURADA (TU ORIGINAL)
   if (args[0] === "call" && args[1] === "mechanic") {
 
     if (!message.member.roles.cache.has(TOKENS_ROLE)) {
@@ -215,35 +244,40 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (!target) return interaction.reply({ content: "no encontrado", ephemeral: true });
 
-    const immune = IMMUNE_ROLES.some(r => target.roles.cache.has(r));
-
     let success = false;
 
+    // 🔥 ENCADENAR (MONGO 30 MIN)
     if (action === "chain") {
-      if (immune) return interaction.reply({ content: "inmune", ephemeral: true });
-
-      await target.roles.add(PRISON_ROLE);
-      setTimeout(() => safeRemoveRole(target, PRISON_ROLE), 30 * 60000);
+      await addRoleTimer(target, PRISON_ROLE, 30 * 60000);
       success = true;
     }
 
+    // ⛓ LIBERACIÓN
     if (action === "release") {
       await target.roles.remove(PRISON_ROLE);
+      await RoleTimer.deleteMany({ userId: target.id, roleId: PRISON_ROLE });
       success = true;
     }
 
+    // 🛡 INMUNIDAD
     if (action === "immunity") {
-      await target.roles.add(IMMUNITY_ROLE);
-      setTimeout(() => safeRemoveRole(target, IMMUNITY_ROLE), 60 * 60000);
+      await addRoleTimer(target, IMMUNITY_ROLE, 60 * 60000);
       success = true;
     }
 
+    // 🛡 ESCUDO
     if (action === "shield") {
-      await target.roles.add(SHIELD_ROLE);
-      setTimeout(() => safeRemoveRole(target, SHIELD_ROLE), 60 * 60000);
+      await addRoleTimer(target, SHIELD_ROLE, 60 * 60000);
       success = true;
     }
 
+    // 🔓 EXTRAS
+    if (action === "extras") {
+      await addRoleTimer(target, EXTRA_ROLE, 60 * 60 * 1000);
+      success = true;
+    }
+
+    // ✏ RENOMBRAR
     if (action === "rename") {
       const modal = new ModalBuilder()
         .setCustomId(`rename_${targetId}`)
@@ -258,6 +292,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.showModal(modal);
     }
 
+    // 🎲 RANDOM NAME (RESTAURABLE)
     if (action === "randomname") {
       const old = target.nickname || target.user.username;
 
@@ -271,6 +306,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         try {
           if (target.manageable) await target.setNickname(name);
         } catch {}
+
         i++;
         if (i >= 3) clearInterval(interval);
       }, 20000);
@@ -286,17 +322,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
       success = true;
     }
 
-    if (action === "extras") {
-      await target.roles.add(EXTRA_ROLE);
-      setTimeout(() => safeRemoveRole(target, EXTRA_ROLE), 60 * 60 * 1000);
-      success = true;
-    }
-
     if (success) {
       const ok = await consumeToken(buyer);
-      if (!ok) {
-        return interaction.reply({ content: "❌ no tenías token", ephemeral: true });
-      }
+      if (!ok) return interaction.reply({ content: "❌ no tenías token", ephemeral: true });
 
       return interaction.update({
         content: "🟣 compra completada correctamente",
@@ -318,11 +346,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     const original = target.nickname || target.user.username;
 
-    try {
-      if (target.manageable) {
-        await target.setNickname(newName);
-      }
-    } catch {}
+    if (target.manageable) {
+      await target.setNickname(newName).catch(() => {});
+    }
 
     setTimeout(() => {
       if (target.manageable) {
@@ -331,16 +357,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }, 40 * 60000);
 
     const ok = await consumeToken(buyer);
-    if (!ok) {
-      return interaction.reply({ content: "❌ no tenías token", ephemeral: true });
-    }
+    if (!ok) return interaction.reply({ content: "❌ no tenías token", ephemeral: true });
 
     return interaction.reply({ content: "cambiado", ephemeral: true });
   }
 });
 
-client.once(Events.ClientReady, () => {
+// 🚀 START + CLEANER
+client.once(Events.ClientReady, async () => {
   console.log("🤖 mechanic online");
+
+  await checkTimers();
+  setInterval(checkTimers, 60 * 1000);
 });
 
 client.login(process.env.TOKEN);
