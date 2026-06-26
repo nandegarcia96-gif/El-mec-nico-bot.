@@ -93,7 +93,7 @@ async function addRoleTimer(member, roleId, ms) {
   await member.roles.add(roleId);
 }
 
-// 🧹 CHECK EXPIRATIONS
+// 🧹 CHECK EXPIRATIONS (MONGO AUTO CLEAN)
 async function checkTimers() {
   const now = new Date();
 
@@ -131,7 +131,7 @@ client.on("messageCreate", async (message) => {
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
 
-  // 🛒 TIENDA COMPLETA RESTAURADA (TU ORIGINAL)
+  // 🛒 TIENDA COMPLETA (INTACTA)
   if (args[0] === "call" && args[1] === "mechanic") {
 
     if (!message.member.roles.cache.has(TOKENS_ROLE)) {
@@ -246,7 +246,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     let success = false;
 
-    // 🔥 ENCADENAR (MONGO 30 MIN)
+    // 🔥 ENCANDENAR
     if (action === "chain") {
       await addRoleTimer(target, PRISON_ROLE, 30 * 60000);
       success = true;
@@ -292,7 +292,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.showModal(modal);
     }
 
-    // 🎲 RANDOM NAME (RESTAURABLE)
+    // 🎲 RANDOM NAME
     if (action === "randomname") {
       const old = target.nickname || target.user.username;
 
@@ -322,12 +322,20 @@ client.on(Events.InteractionCreate, async (interaction) => {
       success = true;
     }
 
+    // 💳 CONSUMO DE TOKEN AL FINAL (FIX PEDIDO)
     if (success) {
+
       const ok = await consumeToken(buyer);
-      if (!ok) return interaction.reply({ content: "❌ no tenías token", ephemeral: true });
+
+      if (!ok) {
+        return interaction.reply({
+          content: "❌ no tenías token para completar la compra",
+          ephemeral: true
+        });
+      }
 
       return interaction.update({
-        content: "🟣 compra completada correctamente",
+        content: "🟣 acción completada correctamente\n🔒 token consumido al final",
         embeds: [],
         components: []
       });
@@ -363,7 +371,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-// 🚀 START + CLEANER
+// 🚀 START
 client.once(Events.ClientReady, async () => {
   console.log("🤖 mechanic online");
 
