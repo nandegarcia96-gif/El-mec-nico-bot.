@@ -178,7 +178,10 @@ async function checkTimers() {
 // 🟣 MESSAGE SYSTEM
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
-  if (message.channel.id !== ALLOWED_CHANNEL) return;
+  if (
+  message.channel.id !== ALLOWED_CHANNEL &&
+  !message.content.startsWith(">booster")
+) return;
 
   const now = Date.now();
   const cd = cooldown.get(message.author.id) || 0;
