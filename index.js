@@ -33,6 +33,24 @@ const IMMUNITY_ROLE = "1515011976621854790";
 const SHIELD_ROLE = "1449488332273877153";
 const BOOSTER_ROLE = "1427099549364781127";
 const EXTRA_ROLE = "1426678812443148430";
+// 🎨 BOOSTER CUSTOMIZER
+const ADMIN_ROLE = "1514290226946641960";
+
+const BOOSTER_COLORS = [
+  "1520940230222282872", // Azul
+  "1520940500465745951", // Verde
+  "1520940358215929996", // Rosa
+  "1520940313844387880", // Rojo
+  "1520940407779754128"  // Amarillo
+];
+
+const BOOSTER_OPTIONS = {
+  blue: "1520940230222282872",
+  green: "1520940500465745951",
+  pink: "1520940358215929996",
+  red: "1520940313844387880",
+  yellow: "1520940407779754128"
+};
 
 // 🛡️ INMUNIDADES
 const IMMUNE_ROLES = [
@@ -171,6 +189,77 @@ client.on("messageCreate", async (message) => {
   if (!message.content.startsWith(">")) return;
 
   const args = message.content.slice(1).trim().split(/ +/);
+  // 🎨 BOOSTER CUSTOMIZER
+if (args[0] === "booster") {
+
+  const member = message.member;
+
+  const isAdmin = member.roles.cache.has(ADMIN_ROLE);
+
+  const hasBooster =
+    member.roles.cache.has(BOOSTER_ROLE) ||
+    BOOSTER_COLORS.some(id => member.roles.cache.has(id));
+
+  if (!isAdmin && !hasBooster) {
+    return message.reply("❌ Solo Booster o Administradores pueden usar este comando.");
+  }
+
+  const embed = new EmbedBuilder()
+    .setColor(0x8b5cf6)
+    .setTitle("🎨 BOOSTER CUSTOMIZER")
+    .setDescription(
+`Selecciona el color de tu Booster.
+
+• Solo puedes tener un color activo.
+• Puedes cambiarlo cuando quieras.
+• Booster por defecto elimina el color actual.
+
+✨ Uso ilimitado.`
+ )
+.setImage("https://cdn.discordapp.com/attachments/1402268718360297544/1520983770554175640/3861EA98-7752-4D92-A8B4-70BAC6FA999E.gif");
+  const menu = new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId("booster_menu")
+      .setPlaceholder("Selecciona un Booster")
+      .addOptions([
+        {
+          label: "Booster Azul",
+          value: "blue",
+          emoji: "🔵"
+        },
+        {
+          label: "Booster Verde",
+          value: "green",
+          emoji: "🟢"
+        },
+        {
+          label: "Booster Rosa",
+          value: "pink",
+          emoji: "🩷"
+        },
+        {
+          label: "Booster Rojo",
+          value: "red",
+          emoji: "🔴"
+        },
+        {
+          label: "Booster Amarillo",
+          value: "yellow",
+          emoji: "🟡"
+        },
+        {
+          label: "Booster por defecto",
+          value: "default",
+          emoji: "♻️"
+        }
+      ])
+  );
+
+  return message.reply({
+    embeds: [embed],
+    components: [menu]
+  });
+}
 
   if (args[0] === "call" && args[1] === "mechanic") {
     if (!message.member.roles.cache.has(TOKENS_ROLE)) {
@@ -277,6 +366,68 @@ client.on(Events.InteractionCreate, async (interaction) => {
     });
   }
 
+  // 🎨 BOOSTER CUSTOMIZER
+if (
+  interaction.isStringSelectMenu() &&
+  interaction.customId === "booster_menu"
+) {
+
+  const member = interaction.member;
+
+  const isAdmin = member.roles.cache.has(ADMIN_ROLE);
+
+  const hasBooster =
+    member.roles.cache.has(BOOSTER_ROLE) ||
+    BOOSTER_COLORS.some(id => member.roles.cache.has(id));
+
+  if (!isAdmin && !hasBooster) {
+    return interaction.reply({
+      content: "❌ Ya no tienes permiso para usar este menú.",
+      ephemeral: true
+    });
+  }
+
+  // Elimina cualquier color anterior
+  const currentColors = BOOSTER_COLORS.filter(id =>
+    member.roles.cache.has(id)
+  );
+
+  if (currentColors.length) {
+    await member.roles.remove(currentColors).catch(() => {});
+  }
+
+  // Volver al Booster por defecto
+  if (interaction.values[0] === "default") {
+
+    // Si es administrador, solo se elimina el color
+    if (isAdmin) {
+      return interaction.update({
+        content: "♻️ Color eliminado correctamente.",
+        embeds: [],
+        components: []
+      });
+    }
+
+    // El Booster normal conserva su rol base, así que solo quitamos el color
+    return interaction.update({
+      content: "♻️ Has vuelto al Booster por defecto.",
+      embeds: [],
+      components: []
+    });
+  }
+
+  // Agregar nuevo color
+  await member.roles.add(
+    BOOSTER_OPTIONS[interaction.values[0]]
+  ).catch(() => {});
+
+  return interaction.update({
+    content: "✅ Tu color de Booster fue actualizado.",
+    embeds: [],
+    components: []
+  });
+
+}
   if (interaction.isUserSelectMenu()) {
 
     const buyer = interaction.member;
